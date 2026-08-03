@@ -1,0 +1,36 @@
+[Unit]
+Description=sovereign-sigint radiod occupancy producer — HackRF 2m
+# Continuously measures per-channel occupancy from radiod's demodulated
+# 2m-band channels (radiod@hackrf-2m.conf) and writes sightings to the
+# occupancy DB with source_type=radiod-hackrf. Depends on that radiod
+# instance actually running, which in turn depends on the HackRF being
+# owned by radiod rather than OpenWebRX+ or the old scan-based producer.
+#
+# NOT enabled by default at install time — HackRF support in radiod is
+# unconfirmed on this build (see ingest/ka9q-radio/radiod@hackrf-2m.conf
+# header: the project's own docs disagree on whether HackRF support is
+# delivered or still forthcoming). Field-verify radiod@hackrf-2m loads
+# and runs BEFORE enabling this unit; don't assume it from this file
+# existing in the repo.
+After=network-online.target
+Wants=network-online.target
+# radiod@hackrf-2m runs as a system service (like radiod@rx888-hf); we
+# can't hard-require it from a --user unit, but document the dependency:
+# if that instance isn't up, this producer's channels read silent and it
+# records nothing, which is correct behavior rather than an error.
+
+[Service]
+# Long-running, NOT oneshot — same shape as radiod-occupancy.service.
+# __REPO_ROOT__ and __VENV_PYTHON__ substituted by an install script at
+# deploy time (mirrors scripts/phase6-occupancy-producer.sh's pattern;
+# no dedicated install script exists yet for this unit — tracked as a
+# follow-on, don't assume one exists).
+Type=simple
+WorkingDirectory=__REPO_ROOT__/decode
+ExecStart=__VENV_PYTHON__ __REPO_ROOT__/decode/radiod_occupancy_producer.py \
+    --device hackrf --interval 60
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

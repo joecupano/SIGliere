@@ -187,13 +187,39 @@ def parse_channels(config_path: Path) -> list[dict]:
     return channels
 
 
+def _get_interface_ipv4(ifname: str) -> str | None:
+    """Return the IPv4 address for a local interface name, if one exists."""
+    try:
+        addrs = socket.if_nameindex()
+    except AttributeError:
+        addrs = []
+
+    if not isinstance(addrs, list):
+        return None
+
+    for index, name in addrs:
+        if name != ifname:
+            continue
+        try:
+            infos = socket.getaddrinfo(name, None, socket.AF_INET, socket.SOCK_DGRAM)
+        except OSError:
+            continue
+        for family, socktype, proto, canonname, sockaddr in infos:
+            if family != socket.AF_INET:
+                continue
+            ip = sockaddr[0]
+            if ip and not ip.startswith("127."):
+                return ip
+    return None
+
+
 def _select_multicast_iface() -> str:
     """Choose the local interface to join for radiod multicast traffic.
 
     The environment can override the choice explicitly via
-    RADIOD_MULTICAST_IFACE. Otherwise we prefer the primary non-loopback
-    IPv4 address, falling back to loopback when no suitable interface can be
-    resolved.
+    RADIOD_MULTICAST_IFACE. Otherwise we prefer the first non-loopback IPv4
+    address exposed by a real local interface, falling back to loopback when
+    no suitable interface can be resolved.
     """
     iface_override = os.environ.get(RADIOD_MULTICAST_IFACE_ENV)
     if iface_override:
@@ -210,6 +236,18 @@ def _select_multicast_iface() -> str:
             continue
         ip = sockaddr[0]
         if ip and not ip.startswith("127."):
+            return ip
+
+    try:
+        interfaces = socket.if_nameindex()
+    except AttributeError:
+        interfaces = []
+
+    for _, ifname in interfaces:
+        if ifname in {"lo", "lo0"}:
+            continue
+        ip = _get_interface_ipv4(ifname)
+        if ip:
             return ip
 
     return "127.0.0.1"
@@ -239,6 +277,7 @@ def measure_channel_dbfs(stream: str, window_sec: float, verbose: bool) -> float
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(iface_ip))
         sock.bind(('', RADIOD_MULTICAST_PORT))
         mreq = struct.pack('4s4s', socket.inet_aton(addr), socket.inet_aton(iface_ip))
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)

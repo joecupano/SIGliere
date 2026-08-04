@@ -17,15 +17,11 @@
   network exposure), rationale and residual risk for each. Covers all
   three Caddy TLS modes: plain HTTP (default), self-signed local CA
   (`CADDY_TLS=1`), and bring-your-own-certificate (`CADDY_TLS=cert`).
-- **[mcp-server-security-requirements.md](mcp-server-security-requirements.md)**
-  — design + security requirements for a host-side SIGINT MCP server
-  exposing read-only tools (occupancy queries, signal candidate lookup,
-  radiod status) to an LLM client. Ten hard requirements covering
-  injection, least privilege, loopback binding, read-only-first design,
-  and device arbitration. **Status: design guidance maintained on main**;
-  implementation remains a future follow-on rather than a separate branch.
-  See the doc's status banner and [MCP-server-design.md](MCP-server-design.md)
-  for the companion design.
+- **[MCP-server-design.md](MCP-server-design.md)**
+  — the consolidated design and security requirements for a host-side SIGINT
+  MCP server. It covers the architecture, threat model, hard requirements,
+  suggested tools, implementation plan, and deployment guidance for SDR
+  configuration and radiod-based control.
 
 ## Hardware & SDR
 

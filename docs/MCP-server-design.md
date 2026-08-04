@@ -1,10 +1,10 @@
-# MCP Server Design for SDR Configuration and Radiod Access
+# MCP Server Design for SIGINT SDR Control and Radiod Access
 
 ## Purpose
 
-This document proposes an MCP server that lets an AI client manage SDR configuration and access through the existing radiod-based control model. The goal is to make SDR state, tuning, and mode selection available through structured tool calls rather than ad hoc shell commands or manual edits.
+This document combines the design and security requirements for a host-side MCP server that can expose SDR state and control through the existing radiod-based architecture. The goal is to make SDR availability, tuning, mode selection, and demodulator management available through structured tool calls rather than ad hoc shell commands or manual edits.
 
-This document complements [mcp-server-security-requirements.md](mcp-server-security-requirements.md). The two files are maintained together on main as the canonical MCP design for this repository; there is no separate stale implementation branch.
+This single document supersedes the former split between the design note and the security requirements note. The current working path for local chat remains the native Open WebUI tool approach, but this MCP design captures the intended future control plane for the radio stack.
 
 The design is intended for the current build topology:
 
@@ -71,6 +71,51 @@ The first version should expose read-only tools for:
 - available demodulator instances.
 
 Action tools can be added later once the control path is proven safe.
+
+## Threat Model
+
+The MCP server would be a host-side control plane, so it must assume the following risks:
+
+1. Injection via model-supplied arguments.
+2. Prompt-injection chaining into tool calls.
+3. Unauthenticated network access to the tool surface.
+4. Over-broad tool capability.
+5. Resource exhaustion and device contention.
+6. Excessive privilege of the server process itself.
+
+## Security Requirements
+
+The server should follow the same hardening pattern described below:
+
+### R1 — Read-only first; actions are separate, later, individual decisions
+The initial server exposes only read/query tools. Any tool with side effects is added later, one at a time, under its own review.
+
+### R2 — Narrow, single-purpose tools with validated parameters
+Each tool does one well-defined thing. Parameters are constrained to allowlists and numeric ranges, and no free-form SQL, shell, or path parameters are accepted.
+
+### R3 — Parameterized queries, always
+All database access uses parameter placeholders rather than string-formatted SQL.
+
+### R4 — No shell string interpolation
+Any subprocess execution uses an argument list, never shell interpolation.
+
+### R5 — Path confinement
+Any path-like parameter must be sanitized and confined to an allowlisted base directory.
+
+### R6 — Loopback bind + firewall
+The MCP server binds to loopback only and is protected by firewall policy so it is not exposed to the LAN.
+
+### R7 — Least-privilege service account
+The server runs as a dedicated service account with only the read access it needs.
+
+### R8 — Authentication for side-effecting tools
+Any action tool must require an authentication mechanism or other explicit protection.
+
+### R9 — Rate limiting and device arbitration for action tools
+Action tools must respect single-owner SDR arbitration and be rate-limited.
+
+### R10 — Treat untrusted decoded content as hostile input
+Even if the model sees decoded content, tools must not act on it without independent validation.
 
 ## Proposed Architecture
 
@@ -191,17 +236,6 @@ sdrs:
     frequency_range_hz: [24000000, 1766000000]
     modes: [fm, usb, lsb, am, cw]
 ```
-
-## Security Requirements
-
-The server should follow the same hardening pattern described in [docs/mcp-server-security-requirements.md](mcp-server-security-requirements.md):
-
-- bind to loopback only,
-- run as a dedicated service account,
-- allow only validated parameters,
-- never execute shell commands with interpolated user input,
-- never allow arbitrary file paths or shell fragments,
-- require action tools to be explicitly approved or gated.
 
 ## Implementation Plan
 

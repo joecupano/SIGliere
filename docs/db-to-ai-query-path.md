@@ -63,8 +63,7 @@ We built all three. Only the native tool reliably works with local Ollama
 models in Open WebUI.
 
 ### MCP server (planned, documented in the MCP design docs)
-The MCP approach is documented in [MCP-server-design.md](MCP-server-design.md)
-and [mcp-server-security-requirements.md](mcp-server-security-requirements.md).
+The MCP approach is documented in [MCP-server-design.md](MCP-server-design.md).
 It remains a future integration path rather than a separate implementation
 branch in this repository. Open WebUI's native MCP client has had compatibility
 issues in the past, so the current working path stays the native Open WebUI

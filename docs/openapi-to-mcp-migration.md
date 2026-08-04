@@ -7,8 +7,7 @@ The SIGINT tools (`query_occupancy`, `lookup_signal_candidate`,
 
 - **`openapi-tools/sigint_openapi_server.py`** — the ACTIVE one. A FastAPI
   server exposing the tools as OpenAPI endpoints.
-- **The MCP design** — documented in [docs/MCP-server-design.md](MCP-server-design.md)
-  and [docs/mcp-server-security-requirements.md](mcp-server-security-requirements.md).
+- **The MCP design** — documented in [docs/MCP-server-design.md](MCP-server-design.md).
   There is no separate stale implementation branch in this repository.
 
 We run the OpenAPI version because Open WebUI's **native MCP client is
@@ -62,8 +61,7 @@ The tool *logic* is identical between the two servers, so switching is
 purely a transport/registration change:
 
 1. **Bring up the MCP server** once it has been implemented on main using the
-   design in [docs/MCP-server-design.md](MCP-server-design.md) and
-   [docs/mcp-server-security-requirements.md](mcp-server-security-requirements.md).
+   design in [docs/MCP-server-design.md](MCP-server-design.md).
    (Same DB path env var, `SIGINT_OCCUPANCY_DB`, applies to both servers.)
 
 2. **Register in Open WebUI** as **MCP (Streamable HTTP)**, URL

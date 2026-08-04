@@ -9,7 +9,7 @@ repeating.
 ## The working solution: a native Open WebUI Python tool
 
 The path that works is a **native in-process Open WebUI tool**:
-`openwebui-tools/sovereign_sigint_occupancy_tool.py`. It defines a `Tools`
+`openwebui-tools/sigint_occupancy_tool.py`. It defines a `Tools`
 class with `query_occupancy` and `radiod_status`, type-hinted with Sphinx
 docstrings the model reads, and queries the occupancy SQLite directly.
 

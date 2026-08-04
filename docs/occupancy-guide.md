@@ -128,7 +128,7 @@ yet):**
 | GNU Radio monitors (old) | **Superseded, never hardware-validated** | `decode/gnuradio-flowgraphs/{hackrf,rtlsdr}_occupancy_monitor.py` — the older single-frequency GNU Radio monitors. Superseded first by the key-freq scan producer, now further superseded by the radiod-based approach above for HackRF (RTL-SDR has no occupancy role at all now). |
 | `radiod` (RX-888) | **WORKING — built, calibrated, continuous** | `decode/radiod_occupancy_producer.py`, run continuously by `systemd/radiod-occupancy.service`. Reads each of radiod's ~17 demodulated HF channels via `pcmrecord`, measures per-channel power, records sightings above a calibrated -30 dBFS threshold. This is the FIRST producer to actually populate the occupancy DB, and it closed the capture→DB→AI loop end to end. Reboot-validated. |
 | OpenWebRX+ (MQTT) | **Not built** | Would need a broker (Mosquitto); MQTT per-mode JSON topics are the natural fit. Discussed, not actioned. |
-| Kismet (protocol layer) | **Bridge WORKING — separate AI source** | Kismet captures WiFi/BT into its own `kismetdb`. It is deliberately NOT flattened into the occupancy DB — instead a **native Open WebUI tool** (`openwebui-tools/sovereign_sigint_kismet_tool.py`) queries kismetdb directly, giving the AI device-centric WiFi intelligence (APs, clients, MACs, SSIDs, signal) alongside RF occupancy. Semi-live via a 15-min refresh timer. See `docs/kismet-to-ai-bridge.md`. |
+| Kismet (protocol layer) | **Bridge WORKING — separate AI source** | Kismet captures WiFi/BT into its own `kismetdb`. It is deliberately NOT flattened into the occupancy DB — instead a **native Open WebUI tool** (`openwebui-tools/sigint_kismet_tool.py`) queries kismetdb directly, giving the AI device-centric WiFi intelligence (APs, clients, MACs, SSIDs, signal) alongside RF occupancy. Semi-live via a 15-min refresh timer. See `docs/kismet-to-ai-bridge.md`. |
 
 **Honest current state:** the occupancy DB has a producer-agnostic schema
 and a concurrency-ready DB layer (WAL + busy_timeout, so multiple
@@ -244,7 +244,7 @@ directly in a script.
 **Natural-language querying — TWO paths, both working:**
 
 1. **Live tool query (primary) — `docs/db-to-ai-query-path.md`.** A native
-   Open WebUI tool (`openwebui-tools/sovereign_sigint_occupancy_tool.py`)
+   Open WebUI tool (`openwebui-tools/sigint_occupancy_tool.py`)
    queries `occupancy.db` directly and live: the local LLM calls
    `query_occupancy`/`radiod_status` and answers from current data. Confirmed
    working — the model returned real WWV and 20m signals with live sighting

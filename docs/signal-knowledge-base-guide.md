@@ -15,9 +15,9 @@ written, the live alternative (an Open WebUI Tool querying the data directly
 on every question) was future work. **That live bridge now exists**, for both
 data sources this guide covers:
 
-- **Occupancy** — `openwebui-tools/sovereign_sigint_occupancy_tool.py` queries
+- **Occupancy** — `openwebui-tools/sigint_occupancy_tool.py` queries
   the occupancy DB live (see `docs/db-to-ai-query-path.md`).
-- **SigID reference** — `openwebui-tools/sovereign_sigid_reference_tool.py`
+- **SigID reference** — `openwebui-tools/sigid_reference_tool.py`
   looks up signals in the SigID mirror live (`lookup_signal`,
   `search_signals`).
 

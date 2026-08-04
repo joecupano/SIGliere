@@ -66,7 +66,7 @@ Volume=/data/reference/sigid:/data/sigid-ref:ro
 # whisper tool can transcribe files the operator drops there OR that
 # radiod's pcmrecord writes. Read-write so faster-whisper's model cache
 # operations (which may touch the working directory) don't fail.
-# See openwebui-tools/sovereign_sigint_whisper_tool.py.
+# See openwebui-tools/sigint_whisper_tool.py.
 Volume=/data/audio:/data/audio
 
 # host.containers.internal lets the container reach services running

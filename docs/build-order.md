@@ -391,10 +391,10 @@ controls are still under **Workspace** for tools/models/prompts, while
 **Admin Panel → Settings → Connections / Models** handles the Ollama
 connection and model pulls. In practice, install these files from
 inside Open WebUI:
-- `openwebui-tools/sovereign_sigint_occupancy_tool.py`
-- `openwebui-tools/sovereign_sigint_kismet_tool.py`
-- `openwebui-tools/sovereign_sigid_reference_tool.py`
-- `openwebui-tools/sovereign_sigint_whisper_tool.py`
+- `openwebui-tools/sigint_occupancy_tool.py`
+- `openwebui-tools/sigint_kismet_tool.py`
+- `openwebui-tools/sigid_reference_tool.py`
+- `openwebui-tools/sigint_whisper_tool.py`
 - `openwebui-prompts/SIGINT-analyst.system-prompt.md`
 - `openwebui-prompts/pol.prompt.md`
 
@@ -931,7 +931,7 @@ occupancy DB, the SigID mirror all feed the AI as things it reasons over).
 
 **Status: DONE.** As of 7.1 Kismet captured WiFi/BT but the data
 dead-ended in kismetdb. The bridge now exists: a **native Open WebUI tool**
-(`openwebui-tools/sovereign_sigint_kismet_tool.py`) reads kismetdb directly
+(`openwebui-tools/sigint_kismet_tool.py`) reads kismetdb directly
 (read-only) and surfaces device/protocol observations — APs, clients, MACs,
 SSIDs, signal, manufacturer — to the AI as things it reasons over in natural
 language, exactly like radiod/occupancy do for RF. It is kept in Kismet's

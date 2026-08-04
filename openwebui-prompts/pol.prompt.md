@@ -16,7 +16,7 @@ picker.
 the occupancy tool enabled). Prompts are model-agnostic — they run
 against whichever model the operator has selected — but the tool call
 inside the prompt won't fire unless the model has
-`sovereign_sigint_occupancy_tool` enabled.
+`sigint_occupancy_tool` enabled.
 
 **How to install.** See `openwebui-prompts/README.md` for step-by-step
 navigation. In short: Workspace → Prompts → + New Prompt → Title

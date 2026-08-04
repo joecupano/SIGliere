@@ -11,10 +11,10 @@ name specific frequencies / timestamps / MAC addresses when correlating.
 slightly less nuanced synthesis.
 
 **Tools to enable on this model** (all four native tools):
-- `sovereign_sigint_occupancy_tool`
-- `sovereign_sigint_kismet_tool`
-- `sovereign_sigid_reference_tool`
-- `sovereign_sigint_whisper_tool`
+- `sigint_occupancy_tool`
+- `sigint_kismet_tool`
+- `sigid_reference_tool`
+- `sigint_whisper_tool`
 
 **How to install.** See `openwebui-prompts/README.md` in this repo for
 step-by-step navigation. In short: Workspace → Models → + New Model → set

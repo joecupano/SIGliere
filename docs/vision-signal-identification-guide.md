@@ -116,7 +116,7 @@ genuinely unknown.
 ## Step 4: Confirm Against the SigID Reference Tool (live lookup)
 
 The vision model gives you a *shape* description; the **SigID reference
-native tool** (`openwebui-tools/sovereign_sigid_reference_tool.py`) gives you
+native tool** (`openwebui-tools/sigid_reference_tool.py`) gives you
 the authoritative *catalog detail* to match it against — a live lookup over
 the mirrored signal catalog (`lookup_signal` by name, `search_signals` by
 keyword or near a frequency). (Install it once via the procedure in

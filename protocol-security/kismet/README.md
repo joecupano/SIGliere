@@ -22,7 +22,7 @@ pipeline: Kismet works at the packet/protocol layer (802.11, BT/BTLE,
 ## Feeding Kismet data to the local LLM
 
 Kismet's captured devices are queryable by the local AI: a native Open WebUI
-tool (`../openwebui-tools/sovereign_sigint_kismet_tool.py`) reads the
+tool (`../openwebui-tools/sigint_kismet_tool.py`) reads the
 `kismetdb` directly and lets the LLM answer questions like "what access points
 were seen, with SSIDs and signal." Kismet runs continuously as a system
 service (`systemd/kismet.service`, installed by `scripts/phase7-kismet.sh`),

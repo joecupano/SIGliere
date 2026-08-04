@@ -9,7 +9,7 @@ flattened into the frequency-based occupancy DB.
 
 ## The working solution: a native Open WebUI tool over kismetdb
 
-`openwebui-tools/sovereign_sigint_kismet_tool.py` — a `Tools` class with:
+`openwebui-tools/sigint_kismet_tool.py` — a `Tools` class with:
 - **`query_wifi_devices`** — list/filter captured devices by type ("AP",
   "Client", "Bridged") and signal; returns MAC, type, signal (dBm), SSID (for
   APs), manufacturer, bytes, first/last-seen.
@@ -98,6 +98,6 @@ signal levels — all from the real kismetdb.
 
 Two AI data sources now, both via native tools, each in its native shape:
 - **RF occupancy** (frequency-domain) — three calibrated SDRs → occupancy DB →
-  `sovereign_sigint_occupancy_tool.py`. See `db-to-ai-query-path.md`.
+  `sigint_occupancy_tool.py`. See `db-to-ai-query-path.md`.
 - **WiFi device intelligence** (protocol-domain) — Kismet → kismetdb →
-  `sovereign_sigint_kismet_tool.py` (this doc).
+  `sigint_kismet_tool.py` (this doc).

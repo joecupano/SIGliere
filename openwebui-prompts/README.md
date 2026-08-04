@@ -51,10 +51,10 @@ labeled **+ New Model**, **Add Model**, or appear as a **+** in the empty pane.
 in Open WebUI. If not, install them first from `openwebui-tools/` per
 the README there. Verify at Workspace → Tools that you see:
 
-- `sovereign_sigint_occupancy_tool`
-- `sovereign_sigint_kismet_tool`
-- `sovereign_sigid_reference_tool`
-- `sovereign_sigint_whisper_tool`
+- `sigint_occupancy_tool`
+- `sigint_kismet_tool`
+- `sigid_reference_tool`
+- `sigint_whisper_tool`
 
 **Then install the model:**
 

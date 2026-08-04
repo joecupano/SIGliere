@@ -285,11 +285,11 @@ describes what it *would* do, or says it lacks the capability:
 Install each via the procedure above; each linked doc gives its mount line and
 example queries.
 
-- **Occupancy** — `sovereign_sigint_occupancy_tool.py`. What's active on the RF
+- **Occupancy** — `sigint_occupancy_tool.py`. What's active on the RF
   bands, from your SDRs. See `docs/db-to-ai-query-path.md`.
-- **Kismet** — `sovereign_sigint_kismet_tool.py`. WiFi devices seen. See
+- **Kismet** — `sigint_kismet_tool.py`. WiFi devices seen. See
   `docs/kismet-to-ai-bridge.md`.
-- **SigID reference** — `sovereign_sigid_reference_tool.py`. What a signal *is*,
+- **SigID reference** — `sigid_reference_tool.py`. What a signal *is*,
   from the mirrored catalog. See the vision guide for the identification
   workflow that ties it together.
 

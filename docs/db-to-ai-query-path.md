@@ -62,13 +62,13 @@ in-process tools are the most reliable tool path for local models.
 We built all three. Only the native tool reliably works with local Ollama
 models in Open WebUI.
 
-### MCP server (parked, on the `broken-mcp` branch)
-Correct and works with other MCP clients (Claude, Goose), but Open WebUI's
-**native MCP client is broken**: it sends `Accept: application/json` without
-the spec-required `text/event-stream`, so spec-compliant MCP servers return
-HTTP 406 and the tools never load (open-webui Discussion #19568, Issue
-#19525). Revisit if/when Open WebUI fixes its MCP client — see
-`openapi-to-mcp-migration.md`.
+### MCP server (planned, documented in the MCP design docs)
+The MCP approach is documented in [MCP-server-design.md](MCP-server-design.md)
+and [mcp-server-security-requirements.md](mcp-server-security-requirements.md).
+It remains a future integration path rather than a separate implementation
+branch in this repository. Open WebUI's native MCP client has had compatibility
+issues in the past, so the current working path stays the native Open WebUI
+tool approach described above.
 
 ### OpenAPI tool server (built, works, but local models won't invoke it)
 `openapi-tools/sigint_openapi_server.py` sidesteps the MCP 406 (Open WebUI's

@@ -1,29 +1,11 @@
 # SIGINT MCP Server — Security Requirements (design-first)
 
-> **Status (2026-07): design complete; implementation built and validated
-> server-side, then PARKED.** The server described here was implemented (three
-> read-only tools: `query_occupancy`, `lookup_signal_candidate`,
-> `radiod_status`), satisfies all requirements below, and was confirmed
-> running correctly on the reference box — it binds, serves Streamable HTTP,
-> and the Open WebUI container can reach it. It is **blocked at the last mile
-> by a known Open WebUI bug**, not by anything in this design or the server:
-> Open WebUI's native MCP client sends `Accept: application/json` on its
-> `GET /mcp` validation request, omitting the `text/event-stream` the MCP
-> spec requires, so any spec-compliant server (including the `fastmcp`-based
-> one here) correctly rejects it with **HTTP 406 Not Acceptable** and the
-> tools never load. This is filed upstream and is a client-side defect in
-> Open WebUI's browser tool-validation path.
->
-> **Where the code lives:** the full implementation (server, hardened systemd
-> unit, README, requirements) is preserved on the **`broken-mcp`** branch, not
-> on `main`. `main` retains this design doc only.
->
-> **To revive it:** either (a) use the **MCPO** proxy (Open WebUI →(OpenAPI)→
-> MCPO →(MCP)→ this server), which routes around the broken native-MCP client
-> via Open WebUI's working OpenAPI path — the approach Open WebUI's own docs
-> recommend; or (b) wait for an Open WebUI release that fixes the `Accept`
-> header and use the native-MCP-direct path. Either way, the server code on
-> `broken-mcp` is ready and this design still governs it.
+> **Status (2026-08): design complete and documented on main.** This document
+> and [MCP-server-design.md](MCP-server-design.md) define the intended host-side
+> MCP architecture for SIGINT tooling in this build. The current working path
+> for local chat remains the native Open WebUI tool approach; MCP is a future
+> integration path when client compatibility and deployment constraints are
+> clear.
 >
 > **Data note:** the highest-value tool (`query_occupancy`) reads the
 > occupancy DB, which is sparse until the radiod occupancy producer is built —

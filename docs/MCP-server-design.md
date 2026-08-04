@@ -4,6 +4,8 @@
 
 This document proposes an MCP server that lets an AI client manage SDR configuration and access through the existing radiod-based control model. The goal is to make SDR state, tuning, and mode selection available through structured tool calls rather than ad hoc shell commands or manual edits.
 
+This document complements [mcp-server-security-requirements.md](mcp-server-security-requirements.md). The two files are maintained together on main as the canonical MCP design for this repository; there is no separate stale implementation branch.
+
 The design is intended for the current build topology:
 
 - RX-888 via radiod for HF and wideband monitoring

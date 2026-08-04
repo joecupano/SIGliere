@@ -22,11 +22,10 @@
   exposing read-only tools (occupancy queries, signal candidate lookup,
   radiod status) to an LLM client. Ten hard requirements covering
   injection, least privilege, loopback binding, read-only-first design,
-  and device arbitration. **Status: implemented and validated server-side,
-  then parked** — blocked by a known Open WebUI MCP-client bug (a 406 from a
-  non-spec-compliant `Accept` header). The implementation lives on the
-  `broken-mcp` branch; revive via the MCPO proxy or an Open WebUI fix. See
-  the doc's status banner for detail.
+  and device arbitration. **Status: design guidance maintained on main**;
+  implementation remains a future follow-on rather than a separate branch.
+  See the doc's status banner and [MCP-server-design.md](MCP-server-design.md)
+  for the companion design.
 
 ## Hardware & SDR
 

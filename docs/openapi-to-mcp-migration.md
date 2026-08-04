@@ -7,8 +7,9 @@ The SIGINT tools (`query_occupancy`, `lookup_signal_candidate`,
 
 - **`openapi-tools/sigint_openapi_server.py`** — the ACTIVE one. A FastAPI
   server exposing the tools as OpenAPI endpoints.
-- **`mcp/sigint_mcp_server.py`** (on the **`broken-mcp`** branch) — the MCP
-  version. Correct and working, but currently unreachable by Open WebUI.
+- **The MCP design** — documented in [docs/MCP-server-design.md](MCP-server-design.md)
+  and [docs/mcp-server-security-requirements.md](mcp-server-security-requirements.md).
+  There is no separate stale implementation branch in this repository.
 
 We run the OpenAPI version because Open WebUI's **native MCP client is
 broken**: during tool validation it sends `Accept: application/json` and
@@ -60,14 +61,9 @@ not a capability one.
 The tool *logic* is identical between the two servers, so switching is
 purely a transport/registration change:
 
-1. **Bring up the MCP server** (from the `broken-mcp` branch):
-   ```
-   git checkout broken-mcp -- mcp/          # or merge mcp/ to main
-   python3 -m venv /opt/sovereign-sigint/venvs/mcp
-   /opt/sovereign-sigint/venvs/mcp/bin/pip install -r mcp/requirements.txt
-   SIGINT_MCP_HOST=0.0.0.0 /opt/sovereign-sigint/venvs/mcp/bin/python \
-       mcp/sigint_mcp_server.py
-   ```
+1. **Bring up the MCP server** once it has been implemented on main using the
+   design in [docs/MCP-server-design.md](MCP-server-design.md) and
+   [docs/mcp-server-security-requirements.md](mcp-server-security-requirements.md).
    (Same DB path env var, `SIGINT_OCCUPANCY_DB`, applies to both servers.)
 
 2. **Register in Open WebUI** as **MCP (Streamable HTTP)**, URL

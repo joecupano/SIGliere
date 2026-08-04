@@ -386,7 +386,10 @@ and the reverse).
 SIGINT tools and prompts from the repo. The repeatable UI procedure is
 in `docs/openwebui-setup-guide.md` (the section titled "Installing a
 Native Tool"), and the prompt/model import steps are in
-`openwebui-prompts/README.md`. In practice, install these files from
+`openwebui-prompts/README.md`. In Open WebUI 0.11.x the relevant
+controls are still under **Workspace** for tools/models/prompts, while
+**Admin Panel → Settings → Connections / Models** handles the Ollama
+connection and model pulls. In practice, install these files from
 inside Open WebUI:
 - `openwebui-tools/sovereign_sigint_occupancy_tool.py`
 - `openwebui-tools/sovereign_sigint_kismet_tool.py`

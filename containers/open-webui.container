@@ -3,7 +3,9 @@ Description=Open WebUI (sovereign-sigint)
 After=network-online.target
 
 [Container]
-Image=ghcr.io/open-webui/open-webui:main
+# Pin to a known-good 0.11.x release so the documented workspace/model/tool
+# workflow matches the UI that the repo now describes.
+Image=ghcr.io/open-webui/open-webui:v0.11.0
 ContainerName=open-webui
 AutoUpdate=registry
 

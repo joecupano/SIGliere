@@ -41,6 +41,12 @@ same pattern the phase scripts follow for services and mounts.
 
 ## How to install `SIGINT-analyst` (Custom Model)
 
+**Open WebUI 0.11.x note:** the UI layout is a little different from 0.10.x,
+but the targets are the same. Use **Workspace** for per-workspace models,
+tools, and prompts, and use **Admin Panel → Settings → Connections / Models**
+for Ollama connectivity and model pulls. In 0.11.x the add action may be
+labeled **+ New Model**, **Add Model**, or appear as a **+** in the empty pane.
+
 **Prerequisite:** all four native tools already imported and enabled
 in Open WebUI. If not, install them first from `openwebui-tools/` per
 the README there. Verify at Workspace → Tools that you see:
@@ -55,12 +61,17 @@ the README there. Verify at Workspace → Tools that you see:
 1. Open Open WebUI in a browser (`http://localhost:8080` locally, or
    via Caddy at your LAN URL).
 2. Navigate to **Workspace → Models**.
-3. Click **+ New Model** (button label may vary between versions —
-   look for the "add" or "create" action in the Models pane).
+3. Click the add/create action in the Models pane (in 0.11.x this is often
+   **+ New Model** or **Add Model**; if the pane is empty, look for the
+   **+** button or the "Create" action in the header).
 4. Fill in:
    - **Name:** `SIGINT-analyst`
    - **Base Model:** `qwen3:14b` (or `llama3-groq-tool-use:8b` for the
      faster / lower-VRAM option; the system prompt works with either)
+   - If **Workspace → Models** shows `0`, that is not a failure: in 0.11.x
+     this screen is the workspace model registry. Create a new entry here and
+     select one of the Ollama models you already pulled (for example
+     `qwen3:14b`) as the base model.
    - **System Prompt:** open `SIGINT-analyst.system-prompt.md` in this
      directory, find the section headed "COPY THIS BLOCK — PASTE INTO
      SYSTEM PROMPT FIELD", and paste the contents of the fenced code
@@ -80,7 +91,8 @@ top of any chat window.
 ## How to install `/pol` (Saved Prompt)
 
 1. Navigate to **Workspace → Prompts**.
-2. Click **+ New Prompt** (button label may vary).
+2. Click the add/create action for prompts (in 0.11.x this is often
+   **+ New Prompt** or **Add Prompt**; the exact label varies by build).
 3. Fill in:
    - **Title:** `Pattern of Life`
    - **Command:** `pol` (Open WebUI adds the `/` prefix automatically

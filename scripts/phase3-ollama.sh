@@ -54,6 +54,13 @@ echo "Models to pull: ${INSTRUCT_MODEL}, ${EMBED_MODEL}, ${VISION_MODEL}, ${TOOL
 echo "(override by exporting INSTRUCT_MODEL / EMBED_MODEL / VISION_MODEL / TOOL_MODEL before running)"
 echo
 
+# Ensure the default install path pulls the full recommended set for this
+# SIGINT stack. If an operator wants a slimmer install, they can override
+# TOOL_MODEL=skip before running the script.
+if [[ "${TOOL_MODEL}" == "skip" ]]; then
+  echo "  Note: TOOL_MODEL=skip set, so the dedicated tool-calling model will be omitted."
+fi
+
 # ---------------------------------------------------------------------
 # Install Ollama (official installer — creates an 'ollama' system user
 # and a systemd service)
@@ -141,14 +148,22 @@ done
 # Pull default models
 # ---------------------------------------------------------------------
 echo "-- Pulling models (this can take a while on first run) --"
-ollama pull "${INSTRUCT_MODEL}"
-ollama pull "${EMBED_MODEL}"
-ollama pull "${VISION_MODEL}"
+pull_model() {
+  local model="$1"
+  echo "-- Pulling ${model} --"
+  ollama pull "${model}"
+}
+
+models_to_pull=("${INSTRUCT_MODEL}" "${EMBED_MODEL}" "${VISION_MODEL}")
 if [[ "${TOOL_MODEL}" != "skip" ]]; then
-  ollama pull "${TOOL_MODEL}"
+  models_to_pull+=("${TOOL_MODEL}")
 else
   echo "  (TOOL_MODEL=skip — not pulling a dedicated tool-calling model)"
 fi
+
+for model in "${models_to_pull[@]}"; do
+  pull_model "${model}"
+done
 
 echo
 echo "-- Installed models --"

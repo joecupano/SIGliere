@@ -6,6 +6,9 @@ your own SIGINT data (occupancy, Kismet, SigID). Every other AI guide in this
 repo assumes Open WebUI is up and a tool is installed the way this guide
 describes. Start here.
 
+This repo now targets Open WebUI **0.11.x** in the shipped container config so
+the UI labels and workspace flow match the newer interface.
+
 This guide has two parts:
 1. **Foundational setup** — first run, models, orientation (do once).
 2. **Installing a native tool** (the section starting at *"## Installing a
@@ -13,11 +16,12 @@ This guide has two parts:
    guides link to. If you already have Open WebUI running and just need to add
    a tool, jump there.
 
----
-
-## What's already running (this build's layout)
-
-By the time you reach this guide, the earlier phases have Open WebUI running as
+Open WebUI 0.11.x changed a few labels and menu placements compared with
+0.10.x. The effective targets are still the same: use **Workspace** for
+per-workspace models, tools, prompts, and knowledge, and use **Admin Panel →
+Settings → Connections / Models** for Ollama connectivity and model pulls. If
+**Workspace → Models** is empty, it usually means Ollama is not connected or
+the model has not been pulled into Ollama yet.
 a rootless Podman container (a systemd **quadlet**), bound to loopback
 `127.0.0.1:8080`, with **Caddy** as the LAN/TLS-facing entry point in front of
 it. The container reaches the host's **Ollama** (the model runtime) via
@@ -97,20 +101,25 @@ ollama pull nomic-embed-text
 ```
 
 They'll then appear in Open WebUI's model selector. (In the UI you can also
-pull via **Admin Panel → Settings → Models**.) When you register a Workspace
-model for tool use (Step D under "Installing a Native Tool"), base it on
-whichever of `qwen3:14b` or `llama3-groq-tool-use:8b` invokes your tools more
-reliably.
+pull via **Admin Panel → Settings → Models**.) In Open WebUI 0.11.x,
+**Workspace → Models** is a workspace model registry, not an auto-populated
+list of every Ollama model. If that pane shows `0`, that is expected until you
+create a workspace model entry for one of the discovered Ollama models (for
+example `qwen3:14b`). When you register a Workspace model for tool use (Step D
+under "Installing a Native Tool"), base it on whichever of `qwen3:14b` or
+`llama3-groq-tool-use:8b` invokes your tools more reliably.
 
 ## Step 3 — Orientation: where things live
 
 Two menus matter for this build:
 
-- **Workspace** (left sidebar) → **Models**, **Tools**, **Knowledge**. This is
-  where you register a model for tool use, install native tools, and manage
-  RAG collections.
+- **Workspace** (left sidebar, or the workspace navigation in 0.11.x) → **Models**,
+  **Tools**, **Prompts**, **Knowledge**. This is where you register a model for
+  tool use, install native tools, add saved prompts, and manage RAG
+  collections.
 - **Admin Panel** (user menu) → **Settings** → **Connections / Models / Tools**
-  — server-wide configuration.
+  — server-wide configuration, including the Ollama connection and model pull
+  actions.
 
 The chat view has a **model selector** (top) and, once a tool is enabled, a
 **tools/wrench icon** near the message box.

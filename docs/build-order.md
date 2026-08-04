@@ -382,6 +382,22 @@ API, not just the login page loading), RAG document upload lands in
 `/data/rag` on the host (verified both directions — host-to-container
 and the reverse).
 
+**Next step inside Open WebUI:** after Phase 4 is up, install the native
+SIGINT tools and prompts from the repo. The repeatable UI procedure is
+in `docs/openwebui-setup-guide.md` (the section titled "Installing a
+Native Tool"), and the prompt/model import steps are in
+`openwebui-prompts/README.md`. In practice, install these files from
+inside Open WebUI:
+- `openwebui-tools/sovereign_sigint_occupancy_tool.py`
+- `openwebui-tools/sovereign_sigint_kismet_tool.py`
+- `openwebui-tools/sovereign_sigid_reference_tool.py`
+- `openwebui-tools/sovereign_sigint_whisper_tool.py`
+- `openwebui-prompts/SIGINT-analyst.system-prompt.md`
+- `openwebui-prompts/pol.prompt.md`
+
+Those are the tool and prompt sources the repo expects to be imported
+into Open WebUI once the base UI is running.
+
 ## Phase 5 — AI ingest pipeline: OCR, imagery, baseline audio
 
 Scripts: `scripts/phase5-ai-ingest.sh` (venv + systemd timer install, run

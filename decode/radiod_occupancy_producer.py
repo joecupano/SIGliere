@@ -73,6 +73,7 @@ from pathlib import Path
 
 RTP_HEADER_SIZE = 12
 RADIOD_MULTICAST_PORT = 5004
+RADIOD_MULTICAST_IFACE_ENV = "RADIOD_MULTICAST_IFACE"
 
 # Import the shared occupancy DB layer (same one every producer uses).
 # This file lives at decode/radiod_occupancy_producer.py, so the repo root
@@ -186,6 +187,34 @@ def parse_channels(config_path: Path) -> list[dict]:
     return channels
 
 
+def _select_multicast_iface() -> str:
+    """Choose the local interface to join for radiod multicast traffic.
+
+    The environment can override the choice explicitly via
+    RADIOD_MULTICAST_IFACE. Otherwise we prefer the primary non-loopback
+    IPv4 address, falling back to loopback when no suitable interface can be
+    resolved.
+    """
+    iface_override = os.environ.get(RADIOD_MULTICAST_IFACE_ENV)
+    if iface_override:
+        return iface_override
+
+    try:
+        infos = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET, socket.SOCK_DGRAM)
+    except OSError:
+        infos = []
+
+    for info in infos:
+        family, socktype, proto, canonname, sockaddr = info
+        if family != socket.AF_INET:
+            continue
+        ip = sockaddr[0]
+        if ip and not ip.startswith("127."):
+            return ip
+
+    return "127.0.0.1"
+
+
 def measure_channel_dbfs(stream: str, window_sec: float, verbose: bool) -> float | None:
     """Capture a short PCM window from a radiod multicast channel and return
     its RMS power in dBFS, or None if capture failed / no audio.
@@ -205,15 +234,18 @@ def measure_channel_dbfs(stream: str, window_sec: float, verbose: bool) -> float
             print(f"    {stream:14} (host lookup failed)")
         return None
 
+    iface_ip = _select_multicast_iface()
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
         sock.bind(('', RADIOD_MULTICAST_PORT))
-        mreq = struct.pack('4s4s', socket.inet_aton(addr), socket.inet_aton('0.0.0.0'))
+        mreq = struct.pack('4s4s', socket.inet_aton(addr), socket.inet_aton(iface_ip))
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         sock.settimeout(window_sec)
-    except OSError:
+    except OSError as exc:
+        if verbose:
+            print(f"    {stream:14} (join failed: {exc})")
         return None
 
     raw = b""

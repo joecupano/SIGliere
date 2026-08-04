@@ -28,12 +28,20 @@ echo "== Phase 4: Open WebUI + Caddy =="
 
 mkdir -p "${QUADLET_DIR}"
 
-# Ensure the Kismet staging service exists and is wired to run before
-# Open WebUI starts. This prevents the chat tool from seeing an empty or
-# stale mount when the container is restarted or the machine boots.
+# Ensure the Kismet and occupancy data sources exist and are wired to run
+# before Open WebUI starts. This prevents the chat tool from seeing an empty
+# or stale mount when the container is restarted or the machine boots.
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
 mkdir -p "${SYSTEMD_USER_DIR}"
 mkdir -p "${HOME}/.config/systemd/user/open-webui.service.d"
+mkdir -p "${HOME}/sovereign-sigint/db"
+
+# Seed the shared occupancy DB directory from the repo copy if it exists.
+# The native tool reads the DB from inside the container, so the mounted host
+# directory must contain the current DB before Open WebUI starts.
+if [[ -f "${REPO_ROOT}/db/occupancy.db" ]]; then
+  cp "${REPO_ROOT}/db/occupancy.db" "${HOME}/sovereign-sigint/db/occupancy.db"
+fi
 
 # Install the Kismet staging unit if it isn't present yet (phase 7 normally
 # owns this, but phase 4 now seeds it so the startup path is robust even if

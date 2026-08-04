@@ -4,13 +4,10 @@
 # Install the HackRF (2m, via radiod) occupancy producer as a continuous
 # systemd --user service, and its supporting system-level radiod@hackrf-2m
 # instance. Mirrors scripts/phase6-occupancy-producer.sh's RX-888 install
-# pattern, with one addition: a field-verify gate, because unlike RX-888,
-# HackRF's radiod front-end driver is NOT confirmed working on this build
-# (the project's own docs disagree on whether HackRF support in radiod is
-# delivered or still forthcoming — see ingest/ka9q-radio/radiod@hackrf-2m.conf
-# header). Rather than silently enable a config that might not load, this
-# script tries a dry-run config load first and fails loud with a specific
-# fix command if HackRF isn't actually supported by the installed radiod.
+# pattern, with one addition: a compatibility gate. Whether a given
+# installed radiod build exposes HackRF support depends on how it was built,
+# so this script performs a dry-run config load first and stops with a
+# specific fix command if the runtime cannot load the HackRF config.
 #
 # Two-layer install, in order:
 #   1. System-level radiod@hackrf-2m.service (owns the USB device, needs
@@ -58,10 +55,9 @@ if [[ ! -x "${VENV_PYTHON}" ]]; then
 fi
 
 # ---------------------------------------------------------------------
-# GATE: field-verify HackRF is actually supported by the installed
-# radiod before doing anything else. This is the check the config file
-# and producer script both call out as unconfirmed — don't proceed past
-# it silently.
+# GATE: verify that this host's installed radiod build can actually load
+# the HackRF config before doing anything else. This avoids silently
+# enabling the service when the runtime lacks HackRF support.
 # ---------------------------------------------------------------------
 echo "-- Field-verify: does this box's radiod support HackRF? --"
 if ! command -v radiod >/dev/null 2>&1; then
@@ -78,22 +74,26 @@ fi
 mkdir -p /etc/radio
 cp "${RADIOD_CONF_SRC}" "${RADIOD_CONF_DST}"
 
-# Dry-run load: radiod -I validates a config without starting as a
-# service. If HackRF support isn't compiled/linked in, this is expected
-# to fail here — that is a real go/no-go result, not a bug to patch
-# around.
-if ! radiod -I "${RADIOD_CONF_DST}" 2>/tmp/hackrf-radiod-verify.log; then
-  echo "ERROR: radiod rejected radiod@hackrf-2m.conf on a dry-run load." >&2
-  echo "       This usually means HackRF front-end support isn't available" >&2
-  echo "       in your installed radiod build (see the notes.md caveat in" >&2
-  echo "       ingest/ka9q-radio/radiod@hackrf-2m.conf's header)." >&2
-  echo "       Details: /tmp/hackrf-radiod-verify.log" >&2
-  echo "       Fix: rebuild ka9q-radio with HackRF support enabled (check" >&2
-  echo "       for /usr/local/lib/ka9q-radio/hackrf* or a static hackrf" >&2
-  echo "       symbol), then re-run this script." >&2
-  exit 1
+# Validate the config when the service is not already running. If
+# radiod@hackrf-2m is already active, the device is already owned by the
+# running instance and a direct load test would fail with "Resource busy";
+# that is an expected condition here, not a deployment failure.
+if systemctl is-active --quiet radiod@hackrf-2m; then
+  echo "   OK: radiod@hackrf-2m is already active; skipping standalone load test."
+else
+  if ! radiod "${RADIOD_CONF_DST}" 2>/tmp/hackrf-radiod-verify.log; then
+    echo "ERROR: radiod rejected radiod@hackrf-2m.conf on a config parse/load." >&2
+    echo "       This usually means HackRF front-end support isn't available" >&2
+    echo "       in your installed radiod build (see the notes.md caveat in" >&2
+    echo "       ingest/ka9q-radio/radiod@hackrf-2m.conf's header)." >&2
+    echo "       Details: /tmp/hackrf-radiod-verify.log" >&2
+    echo "       Fix: rebuild ka9q-radio with HackRF support enabled (check" >&2
+    echo "       for /usr/local/lib/ka9q-radio/hackrf* or a static hackrf" >&2
+    echo "       symbol), then re-run this script." >&2
+    exit 1
+  fi
+  echo "   OK: radiod accepted the HackRF config on load."
 fi
-echo "   OK: radiod accepted the HackRF config on dry-run load."
 
 # ---------------------------------------------------------------------
 # Layer 1: system-level radiod@hackrf-2m instance.
@@ -165,11 +165,12 @@ echo "Producer status:  systemctl --user status radiod-occupancy-hackrf.service"
 echo "Producer logs:    journalctl --user -u radiod-occupancy-hackrf.service -f"
 echo "Free HackRF for OpenWebRX+:  sudo ./scripts/sdr-mode.sh hackrf interactive"
 echo
-echo "The threshold (-30 dBFS) is a PLACEHOLDER — calibrate it:"
+echo "The threshold (-30 dBFS) is still a placeholder for field calibration:"
 echo "  ${VENV_PYTHON} ${REPO_ROOT}/decode/radiod_occupancy_producer.py \\"
 echo "      --device hackrf --once --verbose"
 echo "against a known-quiet vs. known-active channel (e.g. key up 146.520"
-echo "during a local net), then set --threshold-dbfs in the service file."
+echo "during a local net), then set --threshold-dbfs in the service file if"
+echo "you want the producer to be stricter about what counts as active."
 echo
 echo "Confirm sightings are accumulating:"
 echo "  sqlite3 ${OCC_DB} \"SELECT COUNT(*) FROM sightings WHERE source_type='radiod-hackrf';\""

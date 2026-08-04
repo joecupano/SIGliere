@@ -75,13 +75,15 @@ location-specific** — the guides teach how to re-derive them for your site.
   `radiod@hackrf-70cm.conf`), read by the same generalized
   `decode/radiod_occupancy_producer.py --device hackrf`, run by
   `systemd/radiod-occupancy-hackrf.service` (installed by
-  `scripts/phase6-hackrf-occupancy-producer.sh`). **This path is unconfirmed
-  and uncalibrated** — HackRF driver support in `radiod` itself needs a
-  field-verify pass (the deploy script gates on it), and its threshold is a
-  placeholder. Toggled together with `sudo scripts/sdr-mode.sh hackrf
-  {ai|interactive}`. **RTL-SDR no longer has an occupancy role at all** — it's
-  dedicated to ad hoc single-frequency tasking instead (see below), so there
-  is no producer writing VHF/UHF sightings for that device currently. See
+  `scripts/phase6-hackrf-occupancy-producer.sh`). This path is now verified
+  to receive the live multicast RTP audio stream and report real channel
+  power values for the five 2m channels; the current threshold remains a
+  placeholder until you calibrate it against a known-quiet vs. known-active
+  channel, but the transport and parser are working. Toggled together with
+  `sudo scripts/sdr-mode.sh hackrf {ai|interactive}`. **RTL-SDR no longer
+  has an occupancy role at all** — it's dedicated to ad hoc single-frequency
+  tasking instead (see below), so there is no producer writing VHF/UHF
+  sightings for that device currently. See
   [docs/occupancy-guide.md](docs/occupancy-guide.md) for the full, current
   state of each producer.
 - **RTL-SDR ad hoc tasking** — `ingest/ka9q-radio/radiod@rtlsdr-adhoc.conf`

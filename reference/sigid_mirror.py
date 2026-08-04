@@ -49,6 +49,9 @@ from urllib.parse import urljoin
 
 import requests
 
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from sigid_manifest import SigidManifest
 
 BASE_URL = "https://www.sigidwiki.com"
@@ -88,6 +91,8 @@ def discover_api(session: requests.Session) -> str:
                 params={"action": "query", "meta": "siteinfo", "format": "json"},
                 timeout=REQUEST_TIMEOUT,
             )
+            if resp.status_code == 403:
+                continue
             data = resp.json()
             if "query" in data and "general" in data.get("query", {}):
                 log.info("MediaWiki API found at %s", url)
@@ -349,7 +354,7 @@ def run(output_root: Path, dry_run: bool, full_resync: bool) -> dict:
             manifest.finish_run(run_id, pages_synced, files_synced, "success")
         return {"mode": mode, "pages_synced": pages_synced, "files_synced": files_synced}
 
-    except Exception as exc:
+    except BaseException as exc:
         manifest.finish_run(run_id, 0, 0, "error", str(exc))
         raise
 

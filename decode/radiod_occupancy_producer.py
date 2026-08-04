@@ -62,12 +62,17 @@ import math
 import os
 import re
 import select
+import socket
 import struct
 import subprocess
 import sys
 import time
 import wave
 from pathlib import Path
+
+
+RTP_HEADER_SIZE = 12
+RADIOD_MULTICAST_PORT = 5004
 
 # Import the shared occupancy DB layer (same one every producer uses).
 # This file lives at decode/radiod_occupancy_producer.py, so the repo root
@@ -182,70 +187,63 @@ def parse_channels(config_path: Path) -> list[dict]:
 
 
 def measure_channel_dbfs(stream: str, window_sec: float, verbose: bool) -> float | None:
-    """Capture a short WAV window from a radiod PCM channel via pcmrecord and
-    return its RMS power in dBFS, or None if capture failed / no audio.
+    """Capture a short PCM window from a radiod multicast channel and return
+    its RMS power in dBFS, or None if capture failed / no audio.
 
-    Uses the proven interface: `pcmrecord --catmode <stream>` writes WAV to
-    stdout. We read for window_sec then stop, parse the WAV, compute RMS.
+    This uses the same multicast address that radiod publishes for each
+    channel, but it reads it directly with Python instead of relying on the
+    pcmrecord wrapper, which was not yielding data in this environment even
+    though the multicast packets were visible on the host.
     """
-    # -c/--catmode streams WAV to stdout. We time-bound it ourselves and take
-    # whatever audio arrived in the window.
+    if not stream:
+        return None
+
     try:
-        proc = subprocess.Popen(
-            ["pcmrecord", "--catmode", stream],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
-    except FileNotFoundError:
-        print("ERROR: pcmrecord not found on PATH.", file=sys.stderr)
+        addr = socket.gethostbyname(stream)
+    except socket.gaierror:
+        if verbose:
+            print(f"    {stream:14} (host lookup failed)")
+        return None
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
+        sock.bind(('', RADIOD_MULTICAST_PORT))
+        mreq = struct.pack('4s4s', socket.inet_aton(addr), socket.inet_aton('0.0.0.0'))
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        sock.settimeout(window_sec)
+    except OSError:
         return None
 
     raw = b""
     deadline = time.time() + window_sec
-    fd = proc.stdout.fileno()
     try:
-        # select()-based read so a SILENT stream (a channel radiod defines
-        # but that isn't actually flowing, e.g. 2m-aprs when no APRS traffic)
-        # cannot block forever. A plain blocking read() would hang the whole
-        # sweep on the first dead channel. We wait at most until the deadline
-        # for data to appear on each iteration.
         while True:
             remaining = deadline - time.time()
             if remaining <= 0:
                 break
-            ready, _, _ = select.select([fd], [], [], remaining)
-            if not ready:
-                # No data within the remaining window -> silent stream; stop.
+            try:
+                chunk = sock.recv(65535)
+            except socket.timeout:
                 break
-            chunk = os.read(fd, 4096)
             if not chunk:
-                break  # EOF
+                break
             raw += chunk
+            if len(raw) >= 4096:
+                break
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            proc.kill()
+        sock.close()
 
     if len(raw) < 64:
         if verbose:
             print(f"    {stream:14} (no data — stream silent/absent)")
         return None
 
-    # Parse WAV. pcmrecord emits a RIFF header with a streaming-unknown size
-    # (ffffffff), which Python's wave can choke on; parse PCM frames robustly.
-    try:
-        samples = _extract_pcm_s16(raw)
-    except Exception as e:  # noqa: BLE001 - defensive; any parse failure -> skip
-        if verbose:
-            print(f"    {stream}: WAV parse failed ({e.__class__.__name__})")
-        return None
-
+    samples = _extract_pcm_s16(raw)
     if not samples:
         return None
 
-    # RMS -> dBFS relative to full-scale 16-bit (32768).
     sumsq = 0.0
     for s in samples:
         sumsq += float(s) * float(s)
@@ -257,21 +255,25 @@ def measure_channel_dbfs(stream: str, window_sec: float, verbose: bool) -> float
 
 
 def _extract_pcm_s16(raw: bytes) -> list[int]:
-    """Extract 16-bit signed mono PCM samples from a RIFF/WAVE byte blob,
-    tolerating the streaming header pcmrecord emits (unknown RIFF/data size).
+    """Extract 16-bit signed mono PCM samples from one or more RTP packets.
+
+    The radiod multicast stream is RTP. Each packet contains a 12-byte RTP
+    header followed by the audio payload. The payload bytes are 16-bit signed
+    little-endian mono PCM samples, which we decode directly.
     """
-    # Find 'data' chunk; samples follow its 8-byte header.
-    idx = raw.find(b"data")
-    if idx == -1:
-        # No data chunk marker — treat everything after a 44-byte header as PCM.
-        pcm = raw[44:]
-    else:
-        pcm = raw[idx + 8:]
-    # Trim to whole 2-byte frames.
-    n = (len(pcm) // 2) * 2
-    if n == 0:
-        return []
-    return list(struct.unpack("<%dh" % (n // 2), pcm[:n]))
+    samples: list[int] = []
+    offset = 0
+    while offset + RTP_HEADER_SIZE <= len(raw):
+        payload_len = len(raw) - offset - RTP_HEADER_SIZE
+        if payload_len <= 0:
+            break
+        payload = raw[offset + RTP_HEADER_SIZE:offset + RTP_HEADER_SIZE + payload_len]
+        offset += RTP_HEADER_SIZE + payload_len
+        n = (len(payload) // 2) * 2
+        if n == 0:
+            continue
+        samples.extend(struct.unpack("<%dh" % (n // 2), payload[:n]))
+    return samples
 
 
 def run_once(db: OccupancyDB, channels: list[dict], window_sec: float,

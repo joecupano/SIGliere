@@ -139,4 +139,10 @@ class SigidManifest:
             row = conn.execute(
                 "SELECT started_at FROM sync_runs WHERE status = 'success' ORDER BY id DESC LIMIT 1"
             ).fetchone()
+            if row:
+                return row[0]
+
+            row = conn.execute(
+                "SELECT synced_at FROM page_sync ORDER BY synced_at DESC LIMIT 1"
+            ).fetchone()
         return row[0] if row else None

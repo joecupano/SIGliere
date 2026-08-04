@@ -964,14 +964,11 @@ detection-method distinction stays queryable at the indexed
 `source_type` column rather than requiring a `metadata_json` dig.
 
 **Two real gaps carried forward, not resolved this phase:**
-1. **HackRF driver support in `radiod` is unconfirmed on this build.**
-   The project's own docs disagree with each other — the front-end
-   support table lists HackRF as supported, but a separate README
-   paragraph says support is still forthcoming, and `notes.md`
-   describes the author having set the driver aside pending
-   re-integration. `scripts/phase6-hackrf-occupancy-producer.sh`
-   (the new deploy script) gates on a `radiod -I` dry-run load before
-   enabling anything, rather than assuming it works.
+1. **The HackRF radiod path is now verified on this host for the live
+   multicast RTP/PCM stream**, so the transport and parser are no longer
+   the issue. The remaining tuning step is threshold calibration against a
+   known-quiet vs. known-active channel, because the current -30 dBFS
+   value is still a placeholder rather than a site-specific floor.
 2. **Gain parameter names (`lna-gain`/`if-gain`) in the HackRF configs
    are placeholders**, not confirmed `radiod` syntax — the dedicated
    `hackrf.md` doc didn't document gain keys, and I won't invent config

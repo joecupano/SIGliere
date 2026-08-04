@@ -123,7 +123,7 @@ yet):**
 
 | Producer | Status | Notes |
 |---|---|---|
-| HackRF (2m, via radiod) | **Built, UNCONFIRMED/uncalibrated** | `decode/radiod_occupancy_producer.py --device hackrf`, run by `systemd/radiod-occupancy-hackrf.service` (installed by `scripts/phase6-hackrf-occupancy-producer.sh`; toggled via `sudo sdr-mode.sh hackrf {ai\|interactive}`, which now controls both `radiod@hackrf-2m` and the producer together). Reads `ingest/ka9q-radio/radiod@hackrf-2m.conf`'s five 2m channels (APRS 144.39, 144.900, 145.100, ISS packet 145.825, calling 146.520) via `pcmrecord`, same mechanism as the RX-888 producer — NOT the old `hackrf_transfer` scan approach. **Two real gaps, not yet closed:** (1) HackRF driver support in `radiod` itself is unconfirmed on this build — the deploy script's field-verify gate (`radiod -I` dry-run) must pass before this can be trusted at all; (2) the -30 dBFS threshold is a placeholder carried from the RX-888 profile, not a real calibration for this device/signal-chain — see Calibration section below. 70cm coverage exists as a separate, not-yet-activated config (`radiod@hackrf-70cm.conf`) — HackRF can only run one band at a time (20 MHz instantaneous bandwidth can't span 2m+70cm), so switching between them is an open design question. |
+| HackRF (2m, via radiod) | **Working — live RTP/PCM path verified** | `decode/radiod_occupancy_producer.py --device hackrf`, run by `systemd/radiod-occupancy-hackrf.service` (installed by `scripts/phase6-hackrf-occupancy-producer.sh`; toggled via `sudo sdr-mode.sh hackrf {ai\|interactive}`, which now controls both `radiod@hackrf-2m` and the producer together). Reads `ingest/ka9q-radio/radiod@hackrf-2m.conf`'s five 2m channels (APRS 144.39, 144.900, 145.100, ISS packet 145.825, calling 146.520) via the radiod multicast RTP/PCM stream. This path is now verified on this host: the producer receives the live stream and reports real channel power values for all five channels. The current -30 dBFS threshold is still a placeholder until you calibrate it against a known-quiet vs. known-active channel; 70cm coverage exists as a separate, not-yet-activated config (`radiod@hackrf-70cm.conf`) — HackRF can only run one band at a time (20 MHz instantaneous bandwidth can't span 2m+70cm), so switching between them is an open design question. |
 | RTL-SDR (ad hoc tasking) | **Not an occupancy producer — different role entirely** | RTL-SDR no longer has a VHF/UHF occupancy role. `ingest/ka9q-radio/radiod@rtlsdr-adhoc.conf` defines a single `freq = 0` dynamic/prototype channel, tasked live via radiod's `control` program against an unused SSRC — there is no fixed channel list and **no producer writing to the occupancy DB** for this device. The exact `control` tasking CLI syntax is unconfirmed and needs a field check. `scripts/sdr-mode.sh`'s `rtlsdr` toggle still targets the old `vhf-uhf-occupancy@rtlsdr.service` and has NOT been updated to reflect this new role — a known doc/code gap, not yet resolved. |
 | GNU Radio monitors (old) | **Superseded, never hardware-validated** | `decode/gnuradio-flowgraphs/{hackrf,rtlsdr}_occupancy_monitor.py` — the older single-frequency GNU Radio monitors. Superseded first by the key-freq scan producer, now further superseded by the radiod-based approach above for HackRF (RTL-SDR has no occupancy role at all now). |
 | `radiod` (RX-888) | **WORKING — built, calibrated, continuous** | `decode/radiod_occupancy_producer.py`, run continuously by `systemd/radiod-occupancy.service`. Reads each of radiod's ~17 demodulated HF channels via `pcmrecord`, measures per-channel power, records sightings above a calibrated -30 dBFS threshold. This is the FIRST producer to actually populate the occupancy DB, and it closed the capture→DB→AI loop end to end. Reboot-validated. |
@@ -134,16 +134,17 @@ yet):**
 and a concurrency-ready DB layer (WAL + busy_timeout, so multiple
 producers write simultaneously without contention). It is **actively
 populated by radiod (RX-888)**: that producer runs continuously
-(thousands of HF sightings). The **HackRF radiod path exists but is
-unconfirmed/uncalibrated** — driver support and threshold both need
-field verification before it can be trusted (see the producer table
-above). **RTL-SDR has no occupancy producer at all** — its role changed
-to ad hoc single-frequency tasking, which doesn't write to this DB.
-All producers that do write call the identical `record_sighting()`;
-the schema assumes nothing about any specific capture tool.
-`source_type` now distinguishes detection method as well as device —
-`radiod` (RX-888), `radiod-hackrf` (new), vs. legacy `hackrf`/`rtlsdr`
-scan-based sightings already in the DB from before this migration.
+(thousands of HF sightings). The **HackRF radiod path is now working
+for the live 2m multicast stream** and can record sightings from the
+five configured channels; the only remaining tuning step is threshold
+calibration against a known-quiet vs. known-active signal. **RTL-SDR has
+no occupancy producer at all** — its role changed to ad hoc
+single-frequency tasking, which doesn't write to this DB. All producers
+that do write call the identical `record_sighting()`; the schema assumes
+nothing about any specific capture tool. `source_type` now distinguishes
+detection method as well as device — `radiod` (RX-888), `radiod-hackrf`
+(new), vs. legacy `hackrf`/`rtlsdr` scan-based sightings already in the
+DB from before this migration.
 
 ## Calibration — Why It Matters More Than It Sounds
 
@@ -155,10 +156,11 @@ scan-based sightings already in the DB from before this migration.
 > RTL-SDR) were calibrated against raw-IQ RMS power at a single retuned
 > frequency — a different signal chain from radiod's demodulated-audio
 > output. **They do not transfer to `radiod_occupancy_producer.py`'s
-> HackRF profile**, which currently carries an uncalibrated -30 dBFS
-> placeholder instead (see the producer table above). RTL-SDR has no
-> occupancy producer at all now, so its old -18 dBFS number applies to
-> nothing currently running.
+> HackRF profile**, which currently carries a placeholder -30 dBFS
+> threshold until you calibrate it against a known-quiet vs. known-active
+> channel (see the producer table above). RTL-SDR has no occupancy
+> producer at all now, so its old -18 dBFS number applies to nothing
+> currently running.
 
 Every producer uses a **fixed, hand-calibrated detection threshold**, not
 an adaptive one — deliberately not disguised as more sophisticated than it
@@ -277,10 +279,10 @@ null-mode (energy-only, unidentified) detection.
 
 - **`FREQUENCY_BIN_HZ` is an untested placeholder**, not a tuned value
   — see above.
-- **HackRF's radiod path is built but unconfirmed and uncalibrated** —
-  driver support in `radiod` itself needs a field-verify pass (see the
-  deploy script's dry-run gate), and its -30 dBFS threshold is a
-  placeholder, not a measured floor for this device/signal chain.
+- **HackRF's radiod path is built and verified for live 2m multicast
+  capture** — the producer can read the live 2m channels, but its -30 dBFS
+  threshold is still a placeholder until you calibrate it against a known-
+  quiet vs. known-active signal for your site.
 - **RTL-SDR has no occupancy producer** — its role changed to ad hoc
   single-frequency tasking (a `freq = 0` dynamic channel, tasked live
   via `control`), which is inherently interactive and doesn't populate

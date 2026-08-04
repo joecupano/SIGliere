@@ -1,3 +1,6 @@
 
 # Local occupancy database
 db/occupancy.db
+
+# Local Kismet capture data
+kismet-data/latest.kismet

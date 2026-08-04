@@ -4,3 +4,7 @@ db/occupancy.db
 
 # Local Kismet capture data
 kismet-data/latest.kismet
+
+# Python bytecode artifacts
+**/*.pyc
+__pycache__/

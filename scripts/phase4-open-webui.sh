@@ -28,6 +28,28 @@ echo "== Phase 4: Open WebUI + Caddy =="
 
 mkdir -p "${QUADLET_DIR}"
 
+# Ensure the Kismet staging service exists and is wired to run before
+# Open WebUI starts. This prevents the chat tool from seeing an empty or
+# stale mount when the container is restarted or the machine boots.
+SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
+mkdir -p "${SYSTEMD_USER_DIR}"
+mkdir -p "${HOME}/.config/systemd/user/open-webui.service.d"
+
+# Install the Kismet staging unit if it isn't present yet (phase 7 normally
+# owns this, but phase 4 now seeds it so the startup path is robust even if
+# the timer step hasn't run yet).
+sed -e "s|__REPO_ROOT__|${REPO_ROOT}|g" \
+    "${REPO_ROOT}/systemd/kismet-refresh.service" \
+    > "${SYSTEMD_USER_DIR}/kismet-refresh.service"
+cp "${REPO_ROOT}/systemd/kismet-refresh.timer" \
+   "${SYSTEMD_USER_DIR}/kismet-refresh.timer"
+
+cat > "${HOME}/.config/systemd/user/open-webui.service.d/10-kismet-refresh.conf" <<'EOF'
+[Unit]
+Wants=kismet-refresh.service
+After=kismet-refresh.service
+EOF
+
 # ---------------------------------------------------------------------
 # Verify the host-side mount sources the Open WebUI Quadlet expects
 # actually exist. Silent-failure symptom (verified on rubberduck this
@@ -217,7 +239,9 @@ fi
 
 echo "-- Reloading systemd user units --"
 systemctl --user daemon-reload
-
+# Run the Kismet staging step once now so the mounted file is populated
+# before Open WebUI starts.
+"${REPO_ROOT}/scripts/kismet-refresh.sh" || true
 echo "-- Starting Open WebUI and Caddy --"
 # Quadlet-generated units are transient/generator-produced — systemctl
 # enable fails on them ("is transient or generated"), confirmed via a

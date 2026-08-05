@@ -104,6 +104,35 @@ HTTP=200
 
 - Container logs reported `TTL=0` warnings for multicast stream distribution; this did not block control-path success.
 
+## 2026-08-05 Controlled Non-Dry-Run RX-888 Action Test
+
+- Timestamp (UTC): 2026-08-05T05:10:42Z
+- Branch: main
+- Commit under test: cfb5d84
+- Runtime mode: SIGLIERE_MCP_DRY_RUN=false
+- Scope: single operator `set_frequency` call for `rx888-hf` at 7.100 MHz (`usb`)
+
+### Command Pattern
+
+- Started ephemeral MCP container with dry-run disabled and test role tokens.
+- Called `/route_frequency` for `7100000` and then `/set_frequency` for `rx888-hf`.
+
+### Results
+
+- route_frequency: PASS (`7100000` mapped to `rx888-hf`)
+- set_frequency: PASS (HTTP 200)
+
+### Captured Output (summary)
+
+```text
+HTTP=200
+{"dry_run":false,"node_id":"rx888-hf","frequency_hz":7100000.0,"mode":"usb","preset":"usb","status_address":"239.95.191.236","status":"applied","role":"operator"}
+```
+
+### Residual Notes
+
+- Container logs reported `TTL=0` warnings for multicast stream distribution; this did not block control-path success.
+
 ## Evidence Policy
 
 - Add a new dated entry for each significant MCP change merged to main.

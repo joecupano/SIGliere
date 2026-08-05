@@ -59,3 +59,28 @@ bash scripts/phase6-mcp-server-validate.sh
 2. Fill in real token values for `SIGLIERE_MCP_TOKENS_JSON` and `SIGLIERE_OPERATOR_TOKEN`.
 3. Re-run `bash scripts/openwebui-mcp-command.sh` and capture generated URL/header output.
 4. Paste output into Open WebUI MCP Tool settings and validate tool loading.
+
+## 2026-08-05 Open WebUI Settings Generation (Unblocked)
+
+- Timestamp (UTC): 2026-08-05T04:41:54Z
+- Branch: main
+- Commit: fb70162
+- Local setup: created `/home/baldrick/.config/sigliere/mcp.env` from `mcp-server/mcp.env.example`
+- Command: `bash scripts/openwebui-mcp-command.sh`
+
+### Result
+
+- status: PASS (settings generated)
+- output:
+
+```text
+Name: Sigliere MCP
+Type: Streamable HTTP
+URL: http://0.0.0.0:8140
+Headers:
+	Authorization: Bearer operator-token
+```
+
+### Follow-up Required
+
+- Replace placeholder token values in `/home/baldrick/.config/sigliere/mcp.env` before production use.

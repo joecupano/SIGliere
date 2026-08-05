@@ -41,6 +41,7 @@ class NodeConfig:
     radiod_instance: str
     host: str
     port: int
+    status_address: str | None
     min_hz: float
     max_hz: float
     modes: list[str]
@@ -75,6 +76,7 @@ class ServerState:
                 radiod_instance=item["radiod_instance"],
                 host=item["host"],
                 port=int(item["port"]),
+                status_address=item.get("status_address"),
                 min_hz=float(item["min_hz"]),
                 max_hz=float(item["max_hz"]),
                 modes=[str(m).lower() for m in item["modes"]],
@@ -102,6 +104,8 @@ class ServerState:
             radiod_instance=cfg.radiod_instance,
             host=cfg.host,
             port=cfg.port,
+            kind=cfg.kind,
+            status_address=cfg.status_address,
         )
 
 

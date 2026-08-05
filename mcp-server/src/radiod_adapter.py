@@ -18,6 +18,8 @@ class RadiodNode:
     radiod_instance: str
     host: str
     port: int
+    kind: str | None = None
+    status_address: str | None = None
 
 
 class RadiodAdapter:
@@ -68,19 +70,120 @@ class RadiodAdapter:
                 "ka9q-python is not importable. Install dependency or enable dry-run mode."
             )
 
-        # ka9q-python interfaces differ between releases; keep this in a guarded
-        # call so bootstrapping works and operators can adapt one location.
+        if not hasattr(ka9q, "RadiodControl"):
+            raise RuntimeError(
+                "installed ka9q-python is missing RadiodControl; cannot issue live commands"
+            )
+
+        preset = self._mode_to_preset(mode)
+        status_address = self._resolve_status_address(node)
+        control = None
         try:
-            client = ka9q.Client(host=node.host, port=node.port)
-            client.set_frequency(frequency_hz)
-            client.set_mode(mode)
+            control = ka9q.RadiodControl(status_address=status_address)
+            ssrc = self._ensure_ssrc(control, frequency_hz=frequency_hz, preset=preset)
+
+            # Prefer tune() when available; fallback to explicit setters for older APIs.
+            if hasattr(control, "tune"):
+                control.tune(ssrc=ssrc, frequency_hz=frequency_hz, preset=preset, timeout=5.0)
+            else:
+                control.set_frequency(ssrc=ssrc, frequency_hz=frequency_hz)
+                if hasattr(control, "set_preset"):
+                    control.set_preset(ssrc=ssrc, preset=preset)
         except Exception as exc:
             raise RuntimeError(f"radiod command failed: {exc}") from exc
+        finally:
+            if control is not None:
+                try:
+                    control.close()
+                except Exception:
+                    pass
 
         return {
             "dry_run": False,
             "node_id": node.node_id,
             "frequency_hz": frequency_hz,
             "mode": mode,
+            "preset": preset,
+            "status_address": status_address,
             "status": "applied",
         }
+
+    def _resolve_status_address(self, node: RadiodNode) -> str:
+        # Explicit per-node override wins.
+        if node.status_address:
+            return node.status_address
+
+        if ka9q is None or not hasattr(ka9q, "discover_radiod_services"):
+            return node.host
+
+        try:
+            services = ka9q.discover_radiod_services(timeout=2.0)
+        except Exception:
+            return node.host
+
+        instance_tokens = [t for t in node.radiod_instance.lower().replace("_", "-").split("-") if t]
+        kind_token = (node.kind or "").lower().strip()
+
+        # Prefer exact-ish instance/kind matching over first-available fallback.
+        for svc in services:
+            if not isinstance(svc, dict):
+                continue
+            hay = f"{svc.get('name', '')} {svc.get('hostname', '')}".lower()
+            if kind_token and kind_token in hay:
+                return str(svc.get("address") or node.host)
+            if any(tok in hay for tok in instance_tokens if len(tok) >= 3):
+                return str(svc.get("address") or node.host)
+
+        # Last resort: first discovered service address.
+        for svc in services:
+            if isinstance(svc, dict) and svc.get("address"):
+                return str(svc["address"])
+
+        return node.host
+
+    @staticmethod
+    def _mode_to_preset(mode: str) -> str:
+        mapped = {
+            "fm": "nfm",
+            "nfm": "nfm",
+            "wfm": "wfm",
+            "am": "am",
+            "usb": "usb",
+            "lsb": "lsb",
+            "cw": "cw",
+        }
+        return mapped.get(mode.lower().strip(), "iq")
+
+    @staticmethod
+    def _extract_ssrc(result: Any) -> int | None:
+        if isinstance(result, int):
+            return result
+        if isinstance(result, dict) and "ssrc" in result:
+            return int(result["ssrc"])
+        if hasattr(result, "ssrc"):
+            return int(getattr(result, "ssrc"))
+        if isinstance(result, (tuple, list)) and len(result) > 0 and isinstance(result[0], int):
+            return int(result[0])
+        return None
+
+    def _ensure_ssrc(self, control: Any, frequency_hz: float, preset: str) -> int:
+        if hasattr(control, "ensure_channel"):
+            try:
+                result = control.ensure_channel(
+                    frequency_hz=frequency_hz,
+                    preset=preset,
+                    timeout=5.0,
+                )
+                ssrc = self._extract_ssrc(result)
+                if ssrc is not None:
+                    return ssrc
+            except Exception:
+                pass
+
+        if hasattr(control, "create_channel"):
+            result = control.create_channel(frequency_hz=frequency_hz, preset=preset)
+            ssrc = self._extract_ssrc(result)
+            if ssrc is not None:
+                return ssrc
+
+        raise RuntimeError("unable to allocate or discover channel SSRC")

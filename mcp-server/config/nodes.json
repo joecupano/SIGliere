@@ -6,6 +6,7 @@
       "radiod_instance": "rx888-hf",
       "host": "127.0.0.1",
       "port": 5000,
+      "status_address": "239.95.191.236",
       "min_hz": 1000000,
       "max_hz": 30000000,
       "modes": ["am", "usb", "lsb", "cw", "fm"]
@@ -16,6 +17,7 @@
       "radiod_instance": "hackrf-vhf-uhf",
       "host": "127.0.0.1",
       "port": 5001,
+      "status_address": "239.172.80.224",
       "min_hz": 30000000,
       "max_hz": 6000000000,
       "modes": ["am", "usb", "lsb", "cw", "nfm", "wfm", "fm"]

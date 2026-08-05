@@ -73,6 +73,37 @@ HTTP=500
 2. Re-run this controlled non-dry-run test and require HTTP 200 on `set_frequency`.
 3. Keep dry-run mode as default until live action path passes.
 
+## 2026-08-05 Controlled Non-Dry-Run Action Retest (Remediated)
+
+- Timestamp (UTC): 2026-08-05T05:09:06Z
+- Branch: main
+- Commit under test: e61b86d
+- Runtime mode: SIGLIERE_MCP_DRY_RUN=false
+- Scope: single operator `set_frequency` call for `hackrf-vhf-uhf` at 146.520 MHz
+
+### Remediation Applied
+
+1. Replaced legacy `ka9q.Client` usage with `ka9q.RadiodControl` flow in `mcp-server/src/radiod_adapter.py`.
+2. Added explicit `status_address` values to `mcp-server/config/nodes.json` so the container does not depend on `avahi-browse` discovery for this host.
+3. Plumbed optional `status_address` through server config in `mcp-server/src/sigliere_mcp_server.py`.
+
+### Results
+
+- health endpoint: PASS
+- set_frequency: PASS (HTTP 200)
+- response: includes `status: "applied"` and resolved `status_address`
+
+### Captured Output (summary)
+
+```text
+HTTP=200
+{"dry_run":false,"node_id":"hackrf-vhf-uhf","frequency_hz":146520000.0,"mode":"nfm","preset":"nfm","status_address":"239.172.80.224","status":"applied","role":"operator"}
+```
+
+### Residual Notes
+
+- Container logs reported `TTL=0` warnings for multicast stream distribution; this did not block control-path success.
+
 ## Evidence Policy
 
 - Add a new dated entry for each significant MCP change merged to main.

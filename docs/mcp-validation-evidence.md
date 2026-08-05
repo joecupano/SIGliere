@@ -35,6 +35,44 @@ bash scripts/phase6-mcp-server-validate.sh
 [mcp-validate] PASS
 ```
 
+## 2026-08-05 Controlled Non-Dry-Run Action Test
+
+- Timestamp (UTC): 2026-08-05T05:05:04Z
+- Branch: main
+- Commit: 29d2d18
+- Runtime mode: SIGLIERE_MCP_DRY_RUN=false
+- Scope: single operator `set_frequency` call for `hackrf-vhf-uhf` at 146.520 MHz
+
+### Command Pattern
+
+- Started ephemeral MCP container with dry-run disabled and test role tokens.
+- Called `/healthz`, `/route_frequency`, `/radiod_status/hackrf-vhf-uhf`, and `/set_frequency`.
+
+### Results
+
+- health endpoint: PASS
+- route_frequency: PASS
+- radiod_status: DEGRADED (`active: error:FileNotFoundError`, socket unreachable)
+- set_frequency: FAIL (HTTP 500)
+
+### Failure Detail
+
+```text
+HTTP=500
+{"detail":"radiod command failed: module 'ka9q' has no attribute 'Client'"}
+```
+
+### Interpretation
+
+- The live action path is blocked by adapter/library API mismatch in `mcp-server/src/radiod_adapter.py`.
+- Current adapter assumes `ka9q.Client`, but installed `ka9q-python` version does not expose that symbol.
+
+### Required Remediation Before Production Action Mode
+
+1. Update `mcp-server/src/radiod_adapter.py` to match the actual `ka9q-python` API used on this host.
+2. Re-run this controlled non-dry-run test and require HTTP 200 on `set_frequency`.
+3. Keep dry-run mode as default until live action path passes.
+
 ## Evidence Policy
 
 - Add a new dated entry for each significant MCP change merged to main.

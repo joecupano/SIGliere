@@ -79,6 +79,7 @@ Volume=/data/audio:/data/audio
 PodmanArgs=--add-host=host.containers.internal:host-gateway
 Environment=OLLAMA_BASE_URL=http://host.containers.internal:11434
 Environment=ANONYMIZED_TELEMETRY=False
+Environment=WEBUI_SECRET_KEY_FILE=/app/backend/data/.webui_secret_key
 
 [Service]
 Restart=always

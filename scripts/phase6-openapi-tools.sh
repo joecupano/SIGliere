@@ -4,8 +4,7 @@
 # Install the OpenAPI SIGINT tool server as a systemd --user service. This
 # is the DB->AI query path: it exposes the read-only occupancy tools to
 # Open WebUI so the local LLM can query the occupancy database in natural
-# language. See openapi-tools/README.md and
-# docs/openapi-to-mcp-migration.md.
+# language. See openapi-tools/README.md and docs/mcp-validation-evidence.md.
 #
 # Run as your normal user, NOT with sudo (rootless --user pattern, same as
 # the radiod-occupancy producer service).
@@ -84,7 +83,13 @@ echo "== OpenAPI tool server service installed =="
 echo "Status:  systemctl --user status sigint-openapi-tools.service"
 echo "Logs:    journalctl --user -u sigint-openapi-tools.service -f"
 echo "Test:    curl -s http://127.0.0.1:8130/openapi.json -o /dev/null -w '%{http_code}\\n'"
+echo "Helper:  ./scripts/openwebui-openapi-command.sh"
 echo
-echo "Register in Open WebUI: Settings -> External Tools -> Add (Type: OpenAPI),"
-echo "URL http://<box-lan-ip>:8130 , Auth None. (ufw must allow 8130/tcp for"
-echo "the browser-side connection test to reach it.)"
+echo "Register in Open WebUI (Type: OpenAPI):"
+echo "  URL:         http://<box-lan-ip>:8130"
+echo "  OpenAPI spec http://<box-lan-ip>:8130/openapi.json"
+echo "  Auth:        None"
+echo ""
+echo "If Open WebUI is on the same host and browser-side checks still fail,"
+echo "confirm ufw allows 8130/tcp and that your browser can load /openapi.json"
+echo "directly from the chosen host/IP."

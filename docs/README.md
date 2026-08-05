@@ -25,6 +25,9 @@
 - **[mcp-validation-evidence.md](mcp-validation-evidence.md)**
   — dated validation evidence for the MCP server path on this build,
   including command run, commit tested, runtime mode, and pass/fail results.
+- **[openapi-to-mcp-migration.md](openapi-to-mcp-migration.md)**
+  — practical checklist for when to keep OpenAPI, when to switch to MCP,
+  and how to validate and roll back safely.
 
 ## Hardware & SDR
 
@@ -41,10 +44,10 @@
   limitations. Start here for anything occupancy-related.
 
 - **[db-to-ai-query-path.md](db-to-ai-query-path.md)** — how the local
-  LLM queries the occupancy DB in natural language. The WORKING solution
-  (a native Open WebUI tool), why the OpenAPI and MCP approaches were
-  tried and set aside, and the WAL/mount details. Read for the DB→AI
-  loop.
+  LLM queries the occupancy DB in natural language. Covers the active
+  OpenAPI external-tool connection path for Open WebUI, native tool
+  alternatives, and where MCP currently fits as a separately validated
+  control-plane path. Read for the DB→AI loop.
 
 - **[kismet-to-ai-bridge.md](kismet-to-ai-bridge.md)** — the second
   AI data source: WiFi device intelligence from Kismet. A native tool over

@@ -24,8 +24,8 @@ classroom curriculum (article, deck, and 13 lab sessions) lives in
 
 ## What it does
 
-**Three AI data sources, each queried live by the local LLM through native
-Open WebUI tools:**
+**Three AI data sources, each queried live by the local LLM through Open WebUI
+tools (native and external OpenAPI):**
 
 | Source | Answers | Backed by |
 |---|---|---|
@@ -95,11 +95,11 @@ location-specific** — the guides teach how to re-derive them for your site.
 - **Decode layer** — `direwolf` (APRS/AX.25), `multimon-ng` (POCSAG/FLEX/etc.),
   `ffmpeg` for archival recording. (These are also OpenWebRX+'s auto-detected
   decoders.)
-- **AI layer** — Ollama + Open WebUI, GPU-accelerated locally. The LLM reaches
-  each data source through **native in-process Open WebUI tools** — the
-  reliable path for local models (external HTTP/OpenAPI tool-calling proved
-  unreliable to invoke; that journey is documented in
-  [docs/db-to-ai-query-path.md](docs/db-to-ai-query-path.md)). Models:
+- **AI layer** — Ollama + Open WebUI, GPU-accelerated locally. The occupancy
+  query path is exposed by the local **OpenAPI tool server**
+  (`openapi-tools/sigint_openapi_server.py`) and registered in Open WebUI as an
+  OpenAPI connection. Native tools remain available in
+  `openwebui-tools/` for in-process workflows. Models:
   `qwen3:14b` (reasoning + tools), `gemma3:12b` (vision), `nomic-embed-text`
   (embeddings). Setup: [docs/openwebui-setup-guide.md](docs/openwebui-setup-guide.md).
 - **Services** — rootless Podman Quadlet units + systemd `--user` timers;
@@ -126,7 +126,7 @@ decode/             occupancy producers, SigMF writer, reference flowgraphs
 db/                 occupancy database schema + access layer
 reference/          SigID (sigidwiki) sovereign mirror
 openwebui-tools/    the three native AI tools (occupancy, Kismet, SigID)
-openapi-tools/      alternative OpenAPI tool server (superseded by native tools)
+openapi-tools/      OpenAPI tool server for Open WebUI external-tool integration
 protocol-security/  Kismet and related protocol/WiFi tooling
 ai-ingest/          document/image/audio ingest for the RAG knowledge feature
 classroom/          teaching material — article, deck, and 13 lab sessions

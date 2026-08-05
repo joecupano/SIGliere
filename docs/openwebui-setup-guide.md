@@ -124,6 +124,27 @@ Two menus matter for this build:
 The chat view has a **model selector** (top) and, once a tool is enabled, a
 **tools/wrench icon** near the message box.
 
+## External OpenAPI Connection (Current Occupancy Path)
+
+This build also exposes occupancy/radiod read-only functions through the
+OpenAPI server at `openapi-tools/sigint_openapi_server.py`.
+
+When creating that connection in Open WebUI:
+
+1. Choose **Type = OpenAPI**.
+2. Set the connection URL to your server's LAN-reachable address:
+  `http://<box-lan-ip>:8130`.
+3. Set OpenAPI Spec URL to:
+  `http://<box-lan-ip>:8130/openapi.json`.
+4. Set Auth to **None** (for the current `sigint-openapi-tools.service`
+  deployment).
+
+Important: do not mix MCP and OpenAPI endpoints in one connection. If Type is
+OpenAPI, both URL fields must target the OpenAPI server (`:8130`), not the MCP
+server (`:8140`).
+
+Helper script: `scripts/openwebui-openapi-command.sh` prints the exact values.
+
 ---
 
 ## Installing a Native Tool

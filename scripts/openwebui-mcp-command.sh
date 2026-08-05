@@ -3,6 +3,9 @@ set -euo pipefail
 
 # Prints a command suitable for Open WebUI Tool -> MCP Settings.
 # This uses streamable HTTP and the operator token stored in mcp.env.
+# NOTE: only use this when Open WebUI connection Type is MCP.
+# If your Open WebUI only supports OpenAPI tools, use
+# scripts/openwebui-openapi-command.sh instead.
 ENV_FILE="${HOME}/.config/sigliere/mcp.env"
 
 if [[ ! -f "${ENV_FILE}" ]]; then

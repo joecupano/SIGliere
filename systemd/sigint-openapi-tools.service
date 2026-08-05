@@ -3,8 +3,8 @@ Description=sovereign-sigint OpenAPI tool server (DB->AI query path)
 # Exposes the read-only SIGINT tools (query_occupancy, lookup_signal_candidate,
 # radiod_status) to Open WebUI as an OpenAPI tool server. This is the DB->AI
 # query path: it lets the local LLM query the occupancy database in natural
-# language. Uses OpenAPI (not MCP) because Open WebUI's native MCP client is
-# currently broken (see docs/openapi-to-mcp-migration.md).
+# language. Uses OpenAPI (not MCP) for the current Open WebUI external-tool
+# integration path; see docs/mcp-validation-evidence.md for recent validation.
 After=network-online.target
 Wants=network-online.target
 

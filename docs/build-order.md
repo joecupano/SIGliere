@@ -74,6 +74,9 @@ sudo ./scripts/phase6-openwebrx-rx888.sh
 #   (installs a continuous systemd --user service that sweeps radiod's HF
 #   channels into the occupancy DB — confirmed on real hardware to actively
 #   grow the sightings table; requires Phase 6.1's radiod already running)
+
+# Phase 6.7 — OpenAPI tool server (Open WebUI external tool connection path)
+./scripts/phase6-openapi-tools.sh
 ```
 
 `git pull` before each phase if picking this up across multiple

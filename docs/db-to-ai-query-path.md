@@ -6,7 +6,20 @@ This document records the working solution and why it is the way it is, since
 getting here involved three approaches and several dead ends worth not
 repeating.
 
-## The working solution: a native Open WebUI Python tool
+## Current working paths
+
+Two paths are now operational on this build:
+
+1. **OpenAPI external-tool connection in Open WebUI** backed by
+  `openapi-tools/sigint_openapi_server.py`.
+2. **Native in-process Open WebUI Python tool** via
+  `openwebui-tools/sigint_occupancy_tool.py`.
+
+The OpenAPI path is the active UI-facing connection path when Open WebUI is
+configured with Type=OpenAPI. The native tool path remains valid for
+in-process workflows.
+
+## Native in-process Open WebUI Python tool path
 
 The path that works is a **native in-process Open WebUI tool**:
 `openwebui-tools/sigint_occupancy_tool.py`. It defines a `Tools`
@@ -57,10 +70,7 @@ high_hz … and report the results") reliably triggered execution. Smaller
 models may need the explicit phrasing; see Open WebUI's guidance that native
 in-process tools are the most reliable tool path for local models.
 
-## Why NOT the other two approaches (recorded so we don't relitigate)
-
-We built all three. Only the native tool reliably works with local Ollama
-models in Open WebUI.
+## Other approaches and where they fit
 
 ### MCP server (planned, documented in the MCP design docs)
 The MCP approach is documented in [MCP-server-design.md](MCP-server-design.md).
@@ -69,27 +79,23 @@ branch in this repository. Open WebUI's native MCP client has had compatibility
 issues in the past, so the current working path stays the native Open WebUI
 tool approach described above.
 
-### OpenAPI tool server (built, works, but local models won't invoke it)
-`openapi-tools/sigint_openapi_server.py` sidesteps the MCP 406 (Open WebUI's
-OpenAPI path is unaffected) and is reachable and correct — `curl` returns real
-data, the connection tests green (after adding CORS middleware for Open
-WebUI's browser-side preflight). BUT local Ollama models would not reliably
-**invoke** the external OpenAPI tools: they described calls, denied
-capability, or asked clarifying questions without ever executing — no request
-reached the server. This matches Open WebUI's own docs (native in-process
-tools are the most reliable; external OpenAPI the least with local models) and
-community reports (Discussion #25737). The OpenAPI server is kept because it's
-useful for OTHER clients and needs no per-model tool-calling finesse, but it
-is **not** the Open-WebUI-with-local-models path.
+### OpenAPI tool server (active Open WebUI external-tool connection path)
+`openapi-tools/sigint_openapi_server.py` is reachable and returns real data.
+For Open WebUI OpenAPI connections, use browser-reachable URLs for both fields:
+
+- URL: `http://<box-lan-ip>:8130`
+- OpenAPI Spec URL: `http://<box-lan-ip>:8130/openapi.json`
+
+Do not mix MCP endpoint URLs into an OpenAPI connection.
 
 ## Summary
 
 | Approach | Status | Use when |
 |----------|--------|----------|
-| **Native Open WebUI tool** | **WORKING — the answer for Open WebUI + local models** | Local LLM in Open WebUI querying occupancy (the primary case). |
-| OpenAPI tool server | Works, reachable; local models won't reliably invoke | Non-Open-WebUI clients, or future Open WebUI versions with better external-tool calling. |
+| OpenAPI tool server | **WORKING** | Open WebUI Type=OpenAPI connections and other HTTP clients. |
+| **Native Open WebUI tool** | **WORKING** | In-process Open WebUI workflows where native tool attachment is preferred. |
 | MCP server | Parked (Open WebUI MCP client bug) | Other MCP clients (Claude/Goose) now; Open WebUI once its MCP client is fixed. |
 
 The capture→DB→AI loop is closed: RF → RX-888 → radiod → occupancy producer →
-occupancy DB → native tool → local LLM answering in natural language, entirely
-on local hardware.
+occupancy DB → Open WebUI tool path (OpenAPI external or native in-process) →
+local LLM answering in natural language, entirely on local hardware.

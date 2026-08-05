@@ -1,0 +1,24 @@
+[Unit]
+Description=Sigliere MCP bridge (radiod control plane)
+After=network-online.target
+
+[Container]
+Image=localhost/sigliere-mcp:latest
+ContainerName=sigliere-mcp
+Network=host
+
+# Mount node topology from the repo so edits are picked up without image rebuild.
+Volume=%h/sigliere/mcp-server/config:/app/config:ro
+
+# Role-token map and transport settings come from host environment file.
+EnvironmentFile=%h/.config/sigliere/mcp.env
+Environment=SIGLIERE_MCP_NODES_JSON=/app/config/nodes.json
+
+# Host network mode is intentional: radiod sockets are local host endpoints.
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

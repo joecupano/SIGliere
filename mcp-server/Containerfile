@@ -1,0 +1,21 @@
+FROM docker.io/library/python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY mcp-server/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+COPY mcp-server/src /app/src
+COPY mcp-server/config /app/config
+
+EXPOSE 8140
+
+ENV SIGLIERE_MCP_HOST=0.0.0.0
+ENV SIGLIERE_MCP_PORT=8140
+ENV SIGLIERE_MCP_NODES_JSON=/app/config/nodes.json
+ENV SIGLIERE_MCP_DRY_RUN=true
+
+CMD ["python", "/app/src/sigliere_mcp_server.py"]

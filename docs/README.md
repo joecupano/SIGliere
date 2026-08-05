@@ -22,6 +22,9 @@
   MCP server. It covers the architecture, threat model, hard requirements,
   suggested tools, implementation plan, and deployment guidance for SDR
   configuration and radiod-based control.
+- **[mcp-validation-evidence.md](mcp-validation-evidence.md)**
+  — dated validation evidence for the MCP server path on this build,
+  including command run, commit tested, runtime mode, and pass/fail results.
 
 ## Hardware & SDR
 

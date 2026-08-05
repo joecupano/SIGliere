@@ -23,10 +23,17 @@ if [[ -z "${SIGLIERE_OPERATOR_TOKEN:-}" ]]; then
   exit 1
 fi
 
+# Open WebUI runs in a container; wildcard bind addresses are not routable from
+# inside that container. Emit the host-gateway name for MCP tool registration.
+MCP_URL_HOST="${SIGLIERE_MCP_HOST}"
+if [[ "${MCP_URL_HOST}" == "0.0.0.0" ]]; then
+  MCP_URL_HOST="host.containers.internal"
+fi
+
 cat <<EOF
 Name: Sigliere MCP
 Type: Streamable HTTP
-URL: http://${SIGLIERE_MCP_HOST}:${SIGLIERE_MCP_PORT}
+URL: http://${MCP_URL_HOST}:${SIGLIERE_MCP_PORT}
 Headers:
   Authorization: Bearer ${SIGLIERE_OPERATOR_TOKEN}
 EOF

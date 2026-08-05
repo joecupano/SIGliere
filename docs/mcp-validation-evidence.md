@@ -35,6 +35,46 @@ bash scripts/phase6-mcp-server-validate.sh
 [mcp-validate] PASS
 ```
 
+## 2026-08-05 Managed Service + Open WebUI Container-Path Validation
+
+- Timestamp (UTC): 2026-08-05T05:16:08Z
+- Branch: main
+- Commit under test: c4c7296
+- Managed service: `sigliere-mcp.service`
+
+### Service Activation Result
+
+- Installed Quadlet to `~/.config/containers/systemd/sigliere-mcp.container`.
+- Initial state observed as `inactive (dead)`.
+- Started service manually and verified `active` state.
+- Running container verified: `sigliere-mcp`.
+
+### Open WebUI Network-Path Role Tests
+
+- Test origin: inside `open-webui` container.
+- Endpoint `http://0.0.0.0:8140`:
+	- `healthz`: FAIL (`connection refused`)
+	- `set_frequency` analyst/operator: FAIL (`connection refused`)
+- Endpoint `http://host.containers.internal:8140`:
+	- `healthz` with analyst token: PASS (HTTP 200)
+	- `set_frequency` with analyst token: PASS expected deny (HTTP 403)
+	- `set_frequency` with operator token: PASS (HTTP 200, dry-run response)
+
+### Remediation Applied
+
+- Updated `scripts/openwebui-mcp-command.sh` to emit `host.containers.internal`
+	when `SIGLIERE_MCP_HOST=0.0.0.0`.
+
+### Generated Settings After Fix
+
+```text
+Name: Sigliere MCP
+Type: Streamable HTTP
+URL: http://host.containers.internal:8140
+Headers:
+	Authorization: Bearer operator-token
+```
+
 ## 2026-08-05 Controlled Non-Dry-Run Action Test
 
 - Timestamp (UTC): 2026-08-05T05:05:04Z

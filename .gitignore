@@ -8,3 +8,6 @@ kismet-data/latest.kismet
 # Python bytecode artifacts
 **/*.pyc
 __pycache__/
+
+# MCP local virtualenv
+mcp-server/.venv/

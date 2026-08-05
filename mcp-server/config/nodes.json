@@ -1,0 +1,34 @@
+{
+  "nodes": [
+    {
+      "node_id": "rx888-hf",
+      "kind": "rx888",
+      "radiod_instance": "rx888-hf",
+      "host": "127.0.0.1",
+      "port": 5000,
+      "min_hz": 1000000,
+      "max_hz": 30000000,
+      "modes": ["am", "usb", "lsb", "cw", "fm"]
+    },
+    {
+      "node_id": "hackrf-vhf-uhf",
+      "kind": "hackrf",
+      "radiod_instance": "hackrf-vhf-uhf",
+      "host": "127.0.0.1",
+      "port": 5001,
+      "min_hz": 30000000,
+      "max_hz": 6000000000,
+      "modes": ["am", "usb", "lsb", "cw", "nfm", "wfm", "fm"]
+    },
+    {
+      "node_id": "rtlsdr-v4",
+      "kind": "rtlsdr",
+      "radiod_instance": "rtlsdr-v4",
+      "host": "127.0.0.1",
+      "port": 5002,
+      "min_hz": 24000000,
+      "max_hz": 1766000000,
+      "modes": ["am", "usb", "lsb", "cw", "nfm", "wfm", "fm"]
+    }
+  ]
+}

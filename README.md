@@ -70,22 +70,22 @@ location-specific** — the guides teach how to re-derive them for your site.
   demodulated channel) is the one running as a continuous default: installed
   as a continuous systemd `--user` service by
   `scripts/phase6-occupancy-producer.sh`, confirmed on real hardware to
-  actively grow the occupancy DB from live HF traffic. **HackRF has migrated
-  to its own `radiod` instance** (`ingest/ka9q-radio/radiod@hackrf-2m.conf`,
+  actively grow the occupancy DB from live HF traffic.
+  
+  **HackRF has its own `radiod` instance** (`ingest/ka9q-radio/radiod@hackrf-2m.conf`,
   2m band only — HackRF's 20 MHz instantaneous bandwidth can't span 2m+70cm
   in one capture; a 70cm config exists but isn't active, see
   `radiod@hackrf-70cm.conf`), read by the same generalized
   `decode/radiod_occupancy_producer.py --device hackrf`, run by
   `systemd/radiod-occupancy-hackrf.service` (installed by
-  `scripts/phase6-hackrf-occupancy-producer.sh`). This path is now verified
-  to receive the live multicast RTP audio stream and report real channel
-  power values for the five 2m channels; the current threshold remains a
-  placeholder until you calibrate it against a known-quiet vs. known-active
+  `scripts/phase6-hackrf-occupancy-producer.sh`).
+  
+  This path is verified to receive the live multicast RTP audio stream and report real channel  power values for the five 2m channels; the current threshold remains a
+  placeholder until calibrated against a known-quiet vs. known-active
   channel, but the transport and parser are working. Toggled together with
-  `sudo scripts/sdr-mode.sh hackrf {ai|interactive}`. **RTL-SDR no longer
-  has an occupancy role at all** — it's dedicated to ad hoc single-frequency
-  tasking instead (see below), so there is no producer writing VHF/UHF
-  sightings for that device currently. See
+  `sudo scripts/sdr-mode.sh hackrf {ai|interactive}`. 
+  
+  **RTL-SDR** is dedicated to ad hoc single-frequency tasking (see below), so there is no producer writing VHF/UHF sightings for that device currently. See
   [docs/occupancy-guide.md](docs/occupancy-guide.md) for the full, current
   state of each producer.
 - **RTL-SDR ad hoc tasking** — `ingest/ka9q-radio/radiod@rtlsdr-adhoc.conf`

@@ -20,6 +20,19 @@ class RadiodNode:
     port: int
     kind: str | None = None
     status_address: str | None = None
+    # SSRC of a channel radiod already starts at boot (e.g. a conf-declared
+    # [channel] section), if this node has one. When set, set_frequency()
+    # retasks this known-good, already-alive channel directly instead of
+    # dynamically creating a new one via ensure_channel()/create_channel().
+    # rtlsdr-v4 needs this: a brand-new dynamic channel on that instance
+    # bootstraps at freq=0, below the hardware's tunable floor, and the
+    # follow-up command that would move it to a real frequency never gets
+    # applied or acknowledged -- confirmed root cause, see
+    # docs/mcp-validation-evidence.md, "rtlsdr-v4 Root Cause: freq=0
+    # Bootstrap Trap in radiod" and the direct-retask confirmation entry
+    # right after it (0.053s clean success vs. every dynamic-channel
+    # attempt timing out).
+    boot_ssrc: int | None = None
 
 
 class RadiodAdapter:
@@ -83,8 +96,15 @@ class RadiodAdapter:
         try:
             control = ka9q.RadiodControl(status_address=status_address)
 
-            stage = "allocate channel"
-            ssrc = self._ensure_ssrc(control, frequency_hz=frequency_hz, preset=preset)
+            if node.boot_ssrc is not None:
+                # Retask the node's known, already-alive boot-time channel
+                # directly -- skips ensure_channel()/create_channel()
+                # entirely, avoiding the freq=0 dynamic-channel bootstrap
+                # trap this path exists to work around. See RadiodNode.boot_ssrc.
+                ssrc = node.boot_ssrc
+            else:
+                stage = "allocate channel"
+                ssrc = self._ensure_ssrc(control, frequency_hz=frequency_hz, preset=preset)
 
             stage = "tune"
             # Prefer tune() when available; fallback to explicit setters for older APIs.

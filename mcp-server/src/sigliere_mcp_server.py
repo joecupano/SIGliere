@@ -45,6 +45,7 @@ class NodeConfig:
     min_hz: float
     max_hz: float
     modes: list[str]
+    boot_ssrc: int | None = None
 
 
 class ServerState:
@@ -80,6 +81,7 @@ class ServerState:
                 min_hz=float(item["min_hz"]),
                 max_hz=float(item["max_hz"]),
                 modes=[str(m).lower() for m in item["modes"]],
+                boot_ssrc=int(item["boot_ssrc"]) if item.get("boot_ssrc") is not None else None,
             )
             configs[cfg.node_id] = cfg
         return configs
@@ -106,6 +108,7 @@ class ServerState:
             port=cfg.port,
             kind=cfg.kind,
             status_address=cfg.status_address,
+            boot_ssrc=cfg.boot_ssrc,
         )
 
 
@@ -156,6 +159,7 @@ def list_nodes(role: str = Depends(require_role("analyst"))) -> dict[str, Any]:
             "min_hz": n.min_hz,
             "max_hz": n.max_hz,
             "modes": n.modes,
+            "boot_ssrc": n.boot_ssrc,
         }
         for n in state.nodes.values()
     ]

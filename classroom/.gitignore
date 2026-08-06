@@ -1,3 +1,0 @@
-# Never commit installed node modules — regenerate with npm install
-node_modules/
-*.log

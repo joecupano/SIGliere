@@ -602,3 +602,108 @@ trigger logic first.
   eight attempts in this session has been removed. The persistent
   `sigliere-mcp` managed service (dry-run mode) was left untouched
   throughout.
+
+## 2026-08-06 rtlsdr-v4 Retest After Fail-Loud Fix (Diagnostics Improved, Live Action Still FAIL)
+
+- Timestamp (host local, from journalctl; UTC offset not confirmed for
+  this session): 2026-08-06T01:25:44
+- Branch: main
+- Commit under test: `64168c4` ("Fail loud with specific errors in MCP
+  set_frequency channel allocation")
+- Runtime mode: `SIGLIERE_MCP_DRY_RUN=false`
+- Scope: retest of the live `set_frequency` call against `rtlsdr-v4`
+  (146.520 MHz, `nfm`) that failed identically eight times in the prior
+  session, now against the fixed `mcp-server/src/radiod_adapter.py`.
+
+### Command Pattern
+
+- Rebuilt `localhost/sigliere-mcp:latest` from `64168c4` (image must be
+  rebuilt for a source change to take effect — `Containerfile` `COPY`s
+  `mcp-server/src` at build time, it isn't a live-mounted volume).
+- Started an ephemeral, non-dry-run container (`sigliere-mcp-livetest`)
+  on port 8141, distinct from the persistent `sigliere-mcp.service`
+  (still dry-run on 8140), so the managed service stayed untouched.
+- Called `/healthz`, then `/set_frequency` for `rtlsdr-v4`.
+
+### Results
+
+- health endpoint: PASS — `{"ok":true,"role":"analyst","node_count":3,"dry_run":false}`
+- set_frequency: **FAIL (HTTP 500)** — same underlying failure as the
+  prior session, but now with a precise, stage-specific message instead
+  of the old generic one.
+
+### Captured Output
+
+```text
+{"detail":"radiod command failed on rtlsdr-v4 during tune (ssrc=1345155156). The channel was created/located but tune() never confirmed it landed on the requested frequency/preset; it may be left parked and will self-expire (~20s) if untouched. Retry, or raise the tune() timeout if this happens consistently on this node.: No status response received for SSRC 1345155156 within 5.0s"}
+```
+
+`journalctl -u radiod@rtlsdr-v4 -f` during the attempt:
+
+```text
+Aug 06 01:25:22 rubberduck radiod@rtlsdr-v4[1439634]: Established under name 'sovereign-sigint RTL-SDR ad hoc single-frequency tasking'
+Aug 06 01:25:22 rubberduck radiod@rtlsdr-v4[1439635]: Established under name 'rtlsdr-v4-pcm.local'
+Aug 06 01:25:22 rubberduck radiod@rtlsdr-v4[1439637]: Established under name 'rtlsdr-adhoc-status.local'
+Aug 06 01:25:22 rubberduck radiod@rtlsdr-v4[1439641]: Established under name 'rtlsdr-adhoc-pcm.local'
+Aug 06 01:25:22 rubberduck radiod@rtlsdr-v4[1439640]: Established under name 'rubberduck ad-hoc'
+Aug 06 01:25:22 rubberduck radiod@rtlsdr-v4[1439636]: Established under name 'sovereign-sigint RTL-SDR ad hoc single-frequency tasking'
+Aug 06 01:25:44 rubberduck radiod@rtlsdr-v4[1439615]: start_demod: ssrc 1,345,155,156, output rtlsdr-v4-pcm.local, demod 1, freq 0.000, preset fm, filter (-8,000,+8,000)
+Aug 06 01:25:44 rubberduck radiod@rtlsdr-v4[1439615]: dynamically started ssrc 1,345,155,156
+Aug 06 01:26:21 rubberduck radiod@rtlsdr-v4[1439615]: CPU usage: 1.0% since start, 1.0% in last 60.9 sec
+Aug 06 01:27:21 rubberduck radiod@rtlsdr-v4[1439615]: CPU usage: 0.9% since start, 0.8% in last 60.0 sec
+Aug 06 01:28:21 rubberduck radiod@rtlsdr-v4[1439615]: CPU usage: 0.9% since start, 0.8% in last 60.0 sec
+```
+
+**Note:** whether the `-v -v` verbose override from the prior session's
+investigation was active for this run is unconfirmed — the log doesn't
+show the extra per-command noise that override was expected to add
+beyond what's shown here. Treat the log above as standard verbosity
+unless/until confirmed otherwise; don't assume verbose logging was on.
+
+### Interpretation
+
+- **The fix did what it was built to do.** The error now correctly
+  identifies the `tune` stage and includes the `ssrc`, matching the
+  root cause already isolated in the prior session (channel allocation
+  via `ensure_channel`/`create_channel` succeeds; the subsequent
+  `tune()` confirmation wait times out). This is a real improvement in
+  diagnosability, not a guess — same SSRC (`1345155156`) as every prior
+  attempt, same failure point, now stated explicitly instead of via a
+  generic message.
+- **The underlying live action is still blocked**, as expected — this
+  fix deliberately did not touch the 5.0s timeout or the network path
+  (see commit message). No new remediation for the live path was
+  attempted this round.
+- **New lead, not yet confirmed:** the journal shows no second log line
+  of any kind for SSRC `1,345,155,156` after its creation at
+  `01:25:44`, across three full CPU-usage heartbeat cycles (well past
+  both the 5s `tune()` timeout and the ~20s self-expire window). The
+  prior session's packet capture only confirmed the *first* command
+  (`create_channel`) left the host and was acted on; nobody has yet
+  captured whether the *second* command (`tune()`) leaves the host at
+  all. This is a different, narrower question than "is the reply lost"
+  — it's "was the request even sent/received" — and needs its own
+  packet capture to resolve, not an assumption either way.
+
+### Required Remediation (operator action, needs root)
+
+1. **Cheap test, per the original remediation plan:** retry with a
+   longer client-side `tune()` timeout to rule out pure latency vs. a
+   reply (or request) that never arrives at all. Not yet wired as a
+   configurable parameter in `radiod_adapter.py`/`operator_cli.py` —
+   needs either a quick manual Python invocation against the container
+   or a follow-up change to expose it.
+2. **Packet capture specifically on the retune, not just creation:**
+   `sudo tcpdump -i any -n udp port 5006 -c 40` while re-firing
+   `set_frequency`, isolating whether a second command packet leaves
+   the host after the creation packet, and whether radiod's control
+   port ever receives it.
+3. Continue requiring the full round trip (creation *and* a confirmed
+   tune to the requested frequency) before calling `rtlsdr-v4` PASS —
+   this retest does not clear that bar.
+
+### Housekeeping
+
+- Ephemeral `sigliere-mcp-livetest` container on port 8141 was used for
+  this retest, kept separate from the persistent `sigliere-mcp.service`
+  (dry-run, port 8140), which was left untouched.

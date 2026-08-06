@@ -1253,3 +1253,127 @@ rejected before `RadiodControl` is even constructed; a node with no
 - Multiple `radiod@rtlsdr-v4` restarts occurred through this entry's
   testing; the channel's state (frequency/mode) at any given moment
   should not be assumed from prior entries — check live if it matters.
+
+## 2026-08-06 rtlsdr-v4: CORRECTION — Boot Channel Only Survives ONE Command Per Restart
+
+- Timestamp (host local): 2026-08-06T03:31:38–03:36:23
+- Branch: main
+- Commit under test: `275e7b2` (mode-change guard)
+- **This entry corrects the "CONFIRMED WORKING" framing of the two
+  entries immediately above it.** Every prior success in this
+  investigation — the standalone-script tests, and this entry's own
+  first HTTP-path test — happened to be the *first* command sent to
+  the boot channel after a radiod restart. Nobody had tested a third
+  request in sequence until now. It fails.
+
+### Method
+
+Full end-to-end testing via the real MCP HTTP path this session (a
+material change from every earlier entry: this was run directly by
+the agent on `rubberduck`, not relayed through the operator — the
+agent has full shell access on this box; earlier sessions' assumption
+of a separate sandboxed environment was simply wrong, discovered only
+at this point).
+
+1. Fresh `sudo systemctl restart radiod@rtlsdr-v4` (operator-run, agent
+   has no passwordless sudo — that boundary still holds).
+2. Rebuilt `localhost/sigliere-mcp:latest` from `275e7b2`.
+3. Ephemeral container, non-dry-run, health-checked before use.
+
+### Results
+
+| Request | Timing | Mode | Result |
+|---|---|---|---|
+| A (first after restart) | immediate | nfm | **PASS** — 0.089s, `status: applied`, journal shows clean `set ssrc 24920 freq = 145,000,000.000` |
+| — (guard test) | immediate after A | am | **Correctly rejected**, 0.017s, client-side, zero radiod contact (confirmed via journal) |
+| B (second real command) | 5s after A | nfm | **FAIL** — 5.0s timeout, `No status response received for SSRC 24920` |
+| C | 25s after B (30s after A) | nfm | **FAIL** — identical timeout. Channel does not self-recover with time. |
+
+The guard-rejected `am` request is confirmed *not* the cause of B's
+failure — the journal shows zero new radiod activity for it, and B
+failed anyway. Radiod's own process stayed healthy throughout (regular
+`CPU usage` heartbeats every 60s) — this is one channel stuck, not the
+whole instance.
+
+### Root Cause (Source-Confirmed)
+
+`radio.c`'s `demod_thread()` wraps whichever demod function
+(`demod_fm()` etc.) in `while(status == 0){ status = demod_fm(p); ... }`
+— comment: *"When a demod exits, the appropriate one is restarted,
+which can be the same one if demod_type hasn't changed."* `demod_fm()`
+(`fm.c`) returns `0` ("Normal exit") whenever its own inner
+`while(downconvert(chan) == 0)` loop ends for *any* reason, including
+`downconvert()` signaling `restart_needed` after processing a queued
+command (not just fatal termination) — so the outer loop re-enters
+`demod_fm()` from scratch: recreates filter buffers
+(`create_filter_output`), resets the fine-tuning oscillator, resets
+squelch state, everything. This matches the `new filter for chan
+24,920: ...` log line appearing on every *successful* command, not
+just mode changes — ordinary frequency retasking triggers this same
+full restart.
+
+**The critical line: `demod_fm()`'s very first executable statements
+are `pthread_mutex_lock(&chan->status.lock); FREE(chan->status.command);`**
+— unconditional, on every entry. If a new command arrives and gets
+queued (`radio_status.c`'s existing-channel path) while the channel is
+between demod-thread invocations — mid-restart, filters being
+recreated — the next `demod_fm()` entry frees that queued command
+before it is ever processed or replied to. The client waits the full
+`tune()` timeout for a reply that was destroyed, not delayed.
+
+This is consistent with every result in this investigation, including
+the *original* freq=0 bug: a freshly created channel's first real tune
+also triggers this restart cycle, on top of the freq==0 self-destruct
+race already documented — compounding, not competing, explanations.
+The other demod files (`linear.c:45`, `wfm.c:39`, `spectrum.c:34,202`)
+were checked and show the identical `FREE(chan->status.command)`-at-entry
+pattern (same grep as the original root-cause entry), so this is
+unlikely to be FM-specific — plausibly affects any demod type on this
+build.
+
+### Practical Implication
+
+**The `boot_ssrc` fix is real but much narrower than previously
+stated: it reliably handles exactly one retask per `radiod@rtlsdr-v4`
+restart, not repeated ad hoc tasking.** This falls well short of what
+`radiod@rtlsdr-adhoc.conf`'s own design intends ("whatever single
+frequency is of interest right now," implying operators retask this
+node repeatedly over a session). A second `set_frequency` call against
+this node will currently hang 5s and fail, with no self-recovery —
+only a full service restart clears it, which needs root and briefly
+interrupts anything using the channel.
+
+### Status: Deeper Bug, Not Fixed This Session
+
+This is a real `ka9q-radio` bug (or at minimum an unresolved footgun
+in this codebase's restart/command-queue interaction), not something
+fixable from `mcp-server`. Two honest paths forward, neither attempted
+yet:
+
+1. **Report upstream to `ka9q-radio`** with this evidence trail —
+   `demod_fm()`'s unconditional `FREE(chan->status.command)` racing
+   against a same-channel restart cycle looks like a genuine bug, not
+   an intentional design choice, and would plausibly affect any radiod
+   deployment doing live per-channel retasking, not just this ad hoc
+   conf.
+2. **Client-side mitigation (heavy-handed, not yet built):** have
+   `mcp-server` issue `sudo systemctl restart radiod@rtlsdr-v4` before
+   every `set_frequency` call to this node. Requires passwordless sudo
+   for the service account (a real security/operational tradeoff to
+   weigh deliberately, not a small ask) and briefly drops the channel
+   entirely, so this is a real design decision, not a quick patch —
+   do not implement without discussing the tradeoff explicitly.
+
+Until one of those happens, `rtlsdr-v4` should be considered **PASS
+for exactly one retask per restart, FAIL for repeated live tasking** —
+a materially different, more limited status than "PASS" alongside
+`rx888-hf`/`hackrf-vhf-uhf` implied in earlier entries.
+
+### Housekeeping
+
+- Cleaned up three leaked ephemeral containers found still running
+  from earlier in this session (`sigliere-mcp-livetest2`,
+  `-livetest3`, plus this entry's own `-livetest4`/`-livetest5`) —
+  the fourth time in this investigation cleanup was missed. Worth
+  treating as a real, recurring process gap: always run `podman ps -a`
+  before concluding a session, not just after each individual test.

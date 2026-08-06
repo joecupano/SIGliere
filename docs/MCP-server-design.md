@@ -10,7 +10,13 @@ The design is intended for the current build topology:
 
 - RX-888 via radiod for HF and wideband monitoring
 - HackRF via radiod for VHF/UHF channels
-- RTL-SDR via ad hoc or scripted tasking
+- ~~RTL-SDR via ad hoc or scripted tasking~~ — **tried and descoped**
+  (2026-08-06): the client/MCP side was built and fixed, but a
+  `ka9q-radio` bug limits a live-tasked channel to one control command
+  per `radiod` restart — see
+  [ka9q-radio-upstream-issue-command-queue.md](ka9q-radio-upstream-issue-command-queue.md)
+  and [mcp-validation-evidence.md](mcp-validation-evidence.md). RTL-SDR
+  is OpenWebRX+-only until/unless that's patched upstream.
 
 ## Goals
 

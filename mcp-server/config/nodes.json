@@ -21,19 +21,6 @@
       "min_hz": 30000000,
       "max_hz": 6000000000,
       "modes": ["am", "usb", "lsb", "cw", "nfm", "wfm", "fm"]
-    },
-    {
-      "node_id": "rtlsdr-v4",
-      "kind": "rtlsdr",
-      "radiod_instance": "rtlsdr-v4",
-      "host": "127.0.0.1",
-      "port": 5002,
-      "status_address": "239.234.164.106",
-      "min_hz": 24000000,
-      "max_hz": 1766000000,
-      "modes": ["am", "usb", "lsb", "cw", "nfm", "wfm", "fm"],
-      "boot_ssrc": 24920,
-      "boot_mode": "fm"
     }
   ]
 }

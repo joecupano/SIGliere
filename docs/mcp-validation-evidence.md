@@ -1377,3 +1377,57 @@ a materially different, more limited status than "PASS" alongside
   the fourth time in this investigation cleanup was missed. Worth
   treating as a real, recurring process gap: always run `podman ps -a`
   before concluding a session, not just after each individual test.
+
+## 2026-08-06 rtlsdr-v4: DESCOPED from the AI/MCP Path — OpenWebRX+-Only Going Forward
+
+- Decision recorded, not a test result.
+- Given the one-command-per-restart limit above is a `ka9q-radio`
+  source bug, not fixable from this repo, the operator decided:
+  **RTL-SDR is OpenWebRX+-only. It will not be used in the AI/MCP
+  path.**
+
+### What changed
+
+- `mcp-server/config/nodes.json`: the `rtlsdr-v4` node entry removed
+  from the active `"nodes"` list. `GET /nodes`/`route_frequency` will
+  no longer offer or route to it. `node_count` in health checks is now
+  **2**, not 3 — don't be surprised by that relative to every earlier
+  entry in this file.
+- `radiod@rtlsdr-v4.service`: stopped and disabled on the host
+  (operator-run), freeing the RTL-SDR for OpenWebRX+'s single-owner
+  use per `scripts/sdr-mode.sh`'s rule.
+- Upstream bug report drafted:
+  [ka9q-radio-upstream-issue-command-queue.md](ka9q-radio-upstream-issue-command-queue.md)
+  — not yet filed as of this entry (no `gh` CLI available on this
+  host; needs the operator to submit via the GitHub web UI).
+- `README.md`, `docs/MCP-server-design.md`, `scripts/sdr-mode.sh`
+  updated to state the decision and point here.
+
+### What was deliberately preserved, not deleted
+
+Per explicit instruction — "save the work we have done with RTL-SDR
+and radiod should radiod get patched":
+
+- `mcp-server/src/radiod_adapter.py`'s `boot_ssrc`/`boot_mode` support
+  — general-purpose, harmless for nodes that don't set them, and still
+  correct for the "one retask per restart" case if this node is ever
+  reactivated.
+- `mcp-server/config/nodes.rtlsdr-v4.disabled.json` — the exact removed
+  node block, ready to paste back into `nodes.json`'s `"nodes"` array,
+  with a note to re-verify `boot_ssrc`/`boot_mode` against the conf
+  file's state at that time before trusting them.
+- `ingest/ka9q-radio/radiod@rtlsdr-adhoc.conf` — left with its
+  freq=0→24920000 fix and full investigation history in comments;
+  not reverted.
+- This entire evidence log, unedited above this point.
+
+### If picking this back up later
+
+1. Check whether `ka9q-radio` upstream has addressed the command-queue
+   bug (issue link once filed — check this file's git history / the
+   issue draft for the eventual URL).
+2. If so, re-verify against a fresh multi-command live test (not just
+   one retask — that was exactly what earlier entries in this file got
+   wrong) before restoring `rtlsdr-v4` to `nodes.json`.
+3. `sudo systemctl enable --now radiod@rtlsdr-v4` and re-check
+   single-owner conflicts with OpenWebRX+ before re-enabling.

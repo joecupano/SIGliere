@@ -49,7 +49,7 @@ location-specific** — the guides teach how to re-derive them for your site.
 | RAM | 64 GB |
 | GPU | NVIDIA GeForce RTX 5060 Ti (16 GB) |
 | HF SDR | RX-888 MkII (direct sampling) |
-| VHF/UHF SDR | HackRF One (2m, via radiod), RTL-SDR (ad hoc single-frequency tasking) |
+| VHF/UHF SDR | HackRF One (2m, via radiod), RTL-SDR (interactive only, via OpenWebRX+) |
 | WiFi capture | MT7612U (Kismet) |
 | Bluetooth / sub-GHz (future) | Ubertooth One |
 | OS | Ubuntu 24.04 Server |
@@ -65,7 +65,15 @@ location-specific** — the guides teach how to re-derive them for your site.
   channelizing it into many simultaneous demodulated channels over IP
   multicast. Native HackRF support; no SoapySDR layer.
 - **HF/VHF/UHF interactive** — An RTL-SDR is dedicated for interactive use
-  with OpenWebRX+ providing the web waterfall/tuning.
+  with OpenWebRX+ providing the web waterfall/tuning. **Not part of the
+  AI path** — a `radiod`-driven ad hoc live-tasking path was built and
+  fixed at the client/MCP level, but tracing revealed a `ka9q-radio`
+  bug that limits a live-tasked channel to one control command per
+  `radiod` restart, unfixable from this repo. Filed upstream:
+  [docs/ka9q-radio-upstream-issue-command-queue.md](docs/ka9q-radio-upstream-issue-command-queue.md).
+  Full evidence: [docs/mcp-validation-evidence.md](docs/mcp-validation-evidence.md).
+  The `mcp-server` code and `radiod` conf built for this are kept
+  in-repo (not deleted) in case `ka9q-radio` gets patched.
 - **Occupancy producers** — `radiod` (continuous HF, measuring power on each
   demodulated channel) is the one running as a continuous default: installed
   as a continuous systemd `--user` service by
@@ -85,15 +93,11 @@ location-specific** — the guides teach how to re-derive them for your site.
   channel, but the transport and parser are working. Toggled together with
   `sudo scripts/sdr-mode.sh hackrf {ai|interactive}`. 
   
-  **RTL-SDR** is dedicated to ad hoc single-frequency tasking (see below), so there is no producer writing VHF/UHF sightings for that device currently. See
+  **RTL-SDR is OpenWebRX+-only** (decided after the ad hoc AI-tasking
+  path below was tried and abandoned), so there is no producer writing
+  VHF/UHF sightings for that device, and none is planned. See
   [docs/occupancy-guide.md](docs/occupancy-guide.md) for the full, current
   state of each producer.
-- **RTL-SDR ad hoc tasking** — `ingest/ka9q-radio/radiod@rtlsdr-adhoc.conf`
-  defines a single `freq = 0` dynamic/prototype channel, tasked live via
-  `radiod`'s `control` program against an unused SSRC rather than a fixed
-  channel list — this is deliberately interactive, not something an
-  occupancy producer sweeps. The exact `control` tasking syntax is
-  unconfirmed on this build.
 - **Decode layer** — `direwolf` (APRS/AX.25), `multimon-ng` (POCSAG/FLEX/etc.),
   `ffmpeg` for archival recording. (These are also OpenWebRX+'s auto-detected
   decoders.)
@@ -127,7 +131,7 @@ scripts/            phased build + validation scripts (phase1 … phase7)
 systemd/            systemd --user service/timer units
 containers/         Podman Quadlet unit files (Open WebUI, Caddy, MCP server)
 ingest/
-  ka9q-radio/       radiod configs: RX-888 (HF), HackRF (2m/70cm), RTL-SDR (ad hoc)
+  ka9q-radio/       radiod configs: RX-888 (HF), HackRF (2m/70cm), RTL-SDR (ad hoc AI tasking -- built, then abandoned, see docs/mcp-validation-evidence.md; RTL-SDR is OpenWebRX+-only now)
   openwebrx/        OpenWebRX+ profiles for HackRF/RTL-SDR
   direwolf/         APRS/AX.25 TNC configs
 decode/             occupancy producers, SigMF writer, reference flowgraphs

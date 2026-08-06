@@ -24,12 +24,19 @@
 #     vhf-uhf-occupancy@hackrf scan-based service — that unit is retired
 #     for HackRF (still installed as a template file for rtlsdr's use
 #     below, but no longer the HackRF path).
-#   - RTL-SDR still uses the original templated systemd --user service
-#     vhf-uhf-occupancy@<device> (installed by
-#     scripts/phase6-vhf-uhf-producer.sh) — unchanged in this script.
-#     RTL-SDR's role itself is being reconsidered separately (ADS-B /
-#     single-frequency use rather than this key-frequency scan); this
-#     script's rtlsdr path hasn't been updated to reflect that yet.
+#   - RTL-SDR's role is DECIDED as of 2026-08-06: OpenWebRX+-only,
+#     permanently, no AI mode. An ad hoc live-tasking path via
+#     radiod@rtlsdr-v4 was built and fixed at the client/MCP level, but
+#     a ka9q-radio bug limits a live-tasked channel to one control
+#     command per radiod restart -- unfixable from this repo, filed
+#     upstream (see docs/ka9q-radio-upstream-issue-command-queue.md and
+#     docs/mcp-validation-evidence.md). 'rtlsdr ai' below still targets
+#     the OLDER, already-retired vhf-uhf-occupancy@rtlsdr scan service
+#     (installed by scripts/phase6-vhf-uhf-producer.sh) -- a different,
+#     earlier mechanism than the radiod@rtlsdr-v4 path just described.
+#     Neither should be used now; treat 'rtlsdr ai' as deprecated. Left
+#     in place rather than removed, matching this repo's policy of
+#     preserving rather than deleting decommissioned work.
 #
 # HackRF two-layer note: because radiod@hackrf-2m is a SYSTEM service
 # (like radiod@rx888-hf), toggling HackRF's AI/interactive mode now needs
@@ -41,8 +48,8 @@
 #   sudo ./scripts/sdr-mode.sh rx888 interactive    # RX-888 -> OpenWebRX+
 #   sudo ./scripts/sdr-mode.sh hackrf ai            # HackRF -> radiod@hackrf-2m + producer
 #   sudo ./scripts/sdr-mode.sh hackrf interactive   # HackRF -> free/OWRX+
-#   ./scripts/sdr-mode.sh rtlsdr ai                 # RTL-SDR -> vhf-uhf-occupancy (unchanged)
-#   ./scripts/sdr-mode.sh rtlsdr interactive        # RTL-SDR -> free/OWRX+
+#   ./scripts/sdr-mode.sh rtlsdr ai                 # DEPRECATED -- see note above, RTL-SDR is OpenWebRX+-only now
+#   ./scripts/sdr-mode.sh rtlsdr interactive        # RTL-SDR -> free/OWRX+ (the only supported mode now)
 #   ./scripts/sdr-mode.sh rtlsdr status             # per-device detail
 #   ./scripts/sdr-mode.sh hackrf status
 # ---------------------------------------------------------------------
@@ -383,8 +390,8 @@ case "${1:-status}" in
     echo "  hackrf ai                  HackRF -> radiod@hackrf-2m + producer (needs sudo)"
     echo "  hackrf interactive         HackRF -> free/OWRX+ (needs sudo)"
     echo "  hackrf status              HackRF detail (radiod + producer state + USB)"
-    echo "  rtlsdr ai                  RTL-SDR -> vhf-uhf-occupancy@rtlsdr (unchanged)"
-    echo "  rtlsdr interactive         RTL-SDR -> free/OWRX+"
+    echo "  rtlsdr ai                  DEPRECATED -- RTL-SDR is OpenWebRX+-only now, see script header"
+    echo "  rtlsdr interactive         RTL-SDR -> free/OWRX+ (the only supported mode now)"
     echo "  rtlsdr status              RTL-SDR detail (producer state + USB)"
     exit 2 ;;
 esac

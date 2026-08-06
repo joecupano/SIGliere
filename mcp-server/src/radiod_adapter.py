@@ -33,6 +33,14 @@ class RadiodNode:
     # right after it (0.053s clean success vs. every dynamic-channel
     # attempt timing out).
     boot_ssrc: int | None = None
+    # The mode this node's boot_ssrc channel starts in (matches the conf's
+    # [global]/[channel] `mode =`). Used to reject mode requests that would
+    # require a demod-type change on the live boot channel -- confirmed
+    # separately broken (radiod never replies, same symptom as the freq=0
+    # bug but a distinct cause) in docs/mcp-validation-evidence.md's
+    # mode-change isolation test. Same-family mode changes (e.g. fm/nfm/wfm
+    # among each other) are unaffected and stay reliable.
+    boot_mode: str | None = None
 
 
 class RadiodAdapter:
@@ -89,6 +97,23 @@ class RadiodAdapter:
             )
 
         preset = self._mode_to_preset(mode)
+
+        if node.boot_ssrc is not None and node.boot_mode is not None:
+            boot_preset = self._mode_to_preset(node.boot_mode)
+            if self._demod_family(preset) != self._demod_family(boot_preset):
+                raise RuntimeError(
+                    f"mode '{mode}' (preset '{preset}') would require a live demod-type "
+                    f"change on {node.node_id}'s boot channel (ssrc={node.boot_ssrc}), "
+                    f"away from its boot family (mode '{node.boot_mode}' -> preset "
+                    f"'{boot_preset}'). Live demod-type changes on this node are "
+                    "confirmed to hang/fail (radiod never replies) -- this is a separate, "
+                    "unresolved gap from the freq=0 bootstrap issue this boot_ssrc path "
+                    "was built to work around. See docs/mcp-validation-evidence.md, the "
+                    "mode-change isolation test. Retry with a mode in the same family as "
+                    f"'{node.boot_mode}' (e.g. fm/nfm/wfm together, or am/usb/lsb/cw/iq "
+                    "together)."
+                )
+
         status_address = self._resolve_status_address(node)
         control = None
         stage = "connect"
@@ -196,6 +221,18 @@ class RadiodAdapter:
             "cw": "cw",
         }
         return mapped.get(mode.lower().strip(), "iq")
+
+    # Presets that ka9q-radio's create_channel() classifies as DEMOD_TYPE 0
+    # (linear); everything else (fm/nfm/wfm) is DEMOD_TYPE 1 (FM). Mirrors
+    # that same classification (see mcp-server .venv's ka9q/control.py,
+    # create_channel()) so we can tell whether a mode change would require
+    # switching demod type on an already-running channel -- confirmed
+    # broken for boot_ssrc channels, see docs/mcp-validation-evidence.md.
+    _LINEAR_PRESETS = frozenset({"iq", "usb", "lsb", "cw", "am"})
+
+    @classmethod
+    def _demod_family(cls, preset: str) -> str:
+        return "linear" if preset.lower().strip() in cls._LINEAR_PRESETS else "fm"
 
     @staticmethod
     def _extract_ssrc(result: Any) -> int | None:

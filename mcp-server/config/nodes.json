@@ -32,7 +32,8 @@
       "min_hz": 24000000,
       "max_hz": 1766000000,
       "modes": ["am", "usb", "lsb", "cw", "nfm", "wfm", "fm"],
-      "boot_ssrc": 24920
+      "boot_ssrc": 24920,
+      "boot_mode": "fm"
     }
   ]
 }

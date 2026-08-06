@@ -1154,3 +1154,102 @@ boot-time SSRC (`24920`) directly via `tune()`, instead of routing
 through `_ensure_ssrc()`'s `ensure_channel()`/`create_channel()` path
 that dynamically allocates a new SSRC per request. Implementation
 tracked as a follow-up code change, not yet applied as of this entry.
+
+## 2026-08-06 rtlsdr-v4: boot_ssrc Fix Implemented, Live-Tested, and a Second Gap Found
+
+- Timestamp (host local): 2026-08-06T02:47:49–03:22:xx (spans conf
+  deploy through the mode-change isolation test below)
+- Branch: main
+- Commits under test: `0da969f` (conf freq fix), `ec85ba2`
+  (`boot_ssrc` adapter fix, before the mode-change guard added later
+  in this same entry)
+
+### Round 1: `boot_ssrc` Path Confirmed Working, But Live HTTP Test Failed — Race Condition, Not a Real Failure
+
+First attempt through the actual MCP HTTP path (ephemeral container,
+rebuilt image) failed with `during tune (ssrc=24920)` — but the error
+correctly named the boot SSRC, confirming the code change itself was
+exercised correctly (no dynamic channel created). Root cause of *this*
+specific failure: my own test sequencing bundled `podman run -d` →
+`curl` → `podman rm -f` with no wait, so `curl` hit the container
+before Uvicorn had finished starting, then the container was killed
+before a retried request could land. Flagged so a future session
+doesn't misread this as evidence against the fix — it wasn't a fix
+failure, it was a bad test script.
+
+### Round 2: Mode-Change Confound
+
+Once the container was confirmed healthy (`GET /healthz` 200), a
+proper `set_frequency` call still failed the same way. Traced through
+several steps (full detail: this was a live, multi-turn investigation)
+to find the actual variable: **the request changed mode** (`nfm` →
+`am`) in addition to frequency, on a channel whose boot preset is
+`fm`. A same-mode-only follow-up also failed — but that was because
+the *first* (mode-changing) request had already left the channel in a
+bad state (a single-entry command queue server-side; see the earlier
+root-cause entry's `radio_status.c` trace), not because same-mode
+changes are broken.
+
+### Round 3: Clean, Isolated Confirmation (Fresh Restart Each Time)
+
+After `sudo systemctl restart radiod@rtlsdr-v4` (clean channel, back
+to boot preset `fm` at `24,920,000 Hz`):
+
+- **Same-mode (`nfm`), frequency-only retask, via the standalone
+  script directly (no container):** `[+0.060s] tune() OK`, full status
+  returned, confirmed in the journal (`set ssrc 24920 freq =
+  146,500,000.000`). **Reliable.**
+- **On that same still-healthy channel, immediately after, a
+  mode-change-only request (`preset='am'`, same frequency):**
+  `[+5.000s] tune() FAILED: No status response received for SSRC
+  24920 within 5.0s` — and the journal shows **zero** log activity for
+  this attempt, unlike the instant, logged success just before it.
+
+This isolates it cleanly: **frequency changes within the same demod
+family (fm/nfm/wfm) work reliably on the boot channel. A demod-type-
+changing mode switch (into/out of the linear family: am/usb/lsb/cw/iq)
+does not — same symptom as the original freq=0 bug (radiod never
+replies), but a distinct, separate cause** (most likely tied to
+`downconvert()`'s `restart_needed` handling for demod-type changes,
+per the earlier source trace — not yet investigated further).
+
+### Remediation Applied: Fail-Loud Guard, Not a Fix
+
+The actual restart-path bug is not fixed (out of scope for this
+session — would need another full source-trace investigation like the
+freq=0 one). Instead, added a same-family check in
+`radiod_adapter.py`'s `set_frequency()`: when a node declares both
+`boot_ssrc` and `boot_mode`, a request whose mode would require a
+different demod family than the boot mode is rejected immediately,
+before any radiod command is sent, with a clear message pointing at
+this entry rather than silently hanging for 5s like the underlying bug
+does. `nodes.json`'s `rtlsdr-v4` entry now carries `"boot_mode": "fm"`
+alongside `"boot_ssrc": 24920`.
+
+Verified with mocks: `fm`/`nfm`/`wfm` requests pass through unaffected
+(`tune()` invoked normally); `am`/`usb`/`lsb`/`cw` requests are
+rejected before `RadiodControl` is even constructed; a node with no
+`boot_mode` set (guard opt-out) is unaffected either way.
+
+### Current Status of `rtlsdr-v4`
+
+- Frequency retasking within the `fm` family: **working, confirmed
+  live**, via the `boot_ssrc` fix.
+- Mode changes across demod families: **blocked with a clear error**,
+  not fixed. A caller requesting `am`/`usb`/`lsb`/`cw`/`iq` on this
+  node gets an immediate, specific rejection instead of a 5s hang and
+  an opaque timeout.
+- Still not re-verified through the actual MCP HTTP path end-to-end
+  after Round 1's race-condition-spoiled attempt — the standalone
+  script tests in Round 3 are solid evidence the underlying fix works,
+  but a clean HTTP-path retest (properly sequenced this time) would
+  close that last gap.
+
+### Housekeeping
+
+- `/tmp/rtlsdr_retask_boot_channel.py` and
+  `/tmp/rtlsdr_mode_change_test.py` are host-local scratch files, not
+  committed to the repo.
+- Multiple `radiod@rtlsdr-v4` restarts occurred through this entry's
+  testing; the channel's state (frequency/mode) at any given moment
+  should not be assumed from prior entries — check live if it matters.

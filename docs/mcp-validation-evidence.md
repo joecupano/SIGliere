@@ -1108,3 +1108,49 @@ changed upstream.
 - The persistent `sigliere-mcp.service` (dry-run) and the unrelated
   `caddy`/`open-webui` containers were left running throughout,
   untouched.
+
+## 2026-08-06 rtlsdr-v4: Direct Retask of Boot Channel — CONFIRMED WORKING
+
+- Timestamp (host local): 2026-08-06T03:01:44
+- Branch: main
+- Scope: test the "not yet tried" item from the prior entry — retask
+  the already-alive boot-time channel (`ssrc=24920`) directly via
+  `ka9q.RadiodControl.tune()`, bypassing `ensure_channel()`/
+  `create_channel()` entirely, via a standalone script
+  (`/tmp/rtlsdr_retask_boot_channel.py`, not committed).
+
+### Result: Clean, Fast Success
+
+```text
+[+0.000s] calling tune(ssrc=24920, freq=147000000.0, timeout=5.0)...
+[+0.053s] tune() OK: {'ssrc': 24920, 'command_tag': 1007401193, ...,
+  'frequency': 147000000.0, 'preset': 'nfm', ...,
+  'destination': {'family': 'IPv4', 'address': '239.152.12.134', 'port': 5004}, ...}
+```
+
+**0.053 seconds**, full real status response — not a 5s+ timeout.
+Confirmed server-side too, radiod journal (verbose logging still
+active from earlier in this investigation):
+
+```text
+Aug 06 03:01:44 rubberduck radiod@rtlsdr-v4[1482807]: command loadpreset(ssrc=24920) mode=nfm
+Aug 06 03:01:44 rubberduck radiod@rtlsdr-v4[1482807]: set ssrc 24920 freq = 147,000,000.000
+Aug 06 03:01:44 rubberduck radiod@rtlsdr-v4[1482807]: new filter for chan 24,920: IF=[-6,250,6,250], samprate 24,000, kaiser beta 11.0
+```
+
+### Conclusion
+
+**Root cause and fix direction both fully confirmed.** Retasking a
+channel that's already alive and receiving real samples works
+cleanly and fast — the exact opposite of every dynamically-created
+channel tested all day. This closes the investigation's central
+question: the freq=0 bootstrap trap for brand-new dynamic channels on
+this hardware is real, and retasking an already-existing channel is
+the reliable path around it.
+
+**Fix direction for `mcp-server`:** for `rtlsdr-v4` specifically,
+`radiod_adapter.py`'s `set_frequency()` should retask the known
+boot-time SSRC (`24920`) directly via `tune()`, instead of routing
+through `_ensure_ssrc()`'s `ensure_channel()`/`create_channel()` path
+that dynamically allocates a new SSRC per request. Implementation
+tracked as a follow-up code change, not yet applied as of this entry.

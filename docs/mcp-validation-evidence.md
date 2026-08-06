@@ -1009,3 +1009,102 @@ ad-hoc prototype channel default to `freq=0` given this hardware's
   on this host — the build this instance's `radiod`/`control` binaries
   were compiled from. Line numbers are as of this session; re-verify
   if the source tree is updated.
+
+## 2026-08-06 rtlsdr-v4: Conf Fix Tested — Fixes Boot Channel Only, Not `set_frequency`
+
+- Timestamp (host local): 2026-08-06T02:47:49–02:56:xx
+- Branch: main
+- Commit under test: `0da969f` ("rtlsdr-v4: give [AD-HOC] a real
+  starting freq instead of 0")
+- Scope: deploy and live-test the remediation from the prior root-cause
+  entry — does giving `[AD-HOC]` a real starting frequency (`24920000`
+  instead of `0`) fix live retasking?
+
+### Deployment
+
+```bash
+sudo cp ingest/ka9q-radio/radiod@rtlsdr-adhoc.conf /etc/radio/radiod@rtlsdr-v4.conf
+sudo systemctl restart radiod@rtlsdr-v4
+```
+
+### Result 1: The Pre-Declared Boot Channel — Fixed
+
+```text
+Aug 06 02:47:50 rubberduck radiod@rtlsdr-v4[1482807]: start_demod: ssrc 24,920, output rtlsdr-adhoc-pcm.local, demod 1, freq 24,920,000.000, preset fm, filter (-8,000,+8,000)
+Aug 06 02:47:50 rubberduck radiod@rtlsdr-v4[1482807]: [ad-hoc] 1 channels started
+```
+
+The channel radiod auto-starts at boot (`ssrc` auto-derived as
+`24920`, matching the frequency in kHz — apparently radiod's own SSRC
+convention for config-declared channels without an explicit `ssrc=`)
+now comes up at the real, in-range frequency, not `0`. This part of
+the fix worked exactly as intended, confirming the freq=0/hardware
+tuning-floor mechanism was real for this specific case.
+
+### Result 2: Fresh Dynamic Channel Creation (the actual `set_frequency` path) — Still Fails
+
+Moments after the restart, unrelated stray traffic (see Housekeeping —
+an hour-old leaked `sigliere-mcp-livetest` container never cleaned up
+from an earlier session) created ANOTHER dynamic channel, at `freq
+0.000`, same as always — initially confusing, since it looked like
+fresh evidence but wasn't. After clearing that container and running a
+**genuinely fresh, controlled test** — a frequency never used all
+session (`147.000 MHz`, `nfm`) via a new ephemeral container
+(`sigliere-mcp-livetest2`) — the result was unambiguous:
+
+```text
+Aug 06 02:54:27 rubberduck radiod@rtlsdr-v4[1482807]: start_demod: ssrc 1,422,605,731, output rtlsdr-v4-pcm.local, demod 1, freq 0.000, preset fm, filter (-8,000,+8,000)
+Aug 06 02:54:27 rubberduck radiod@rtlsdr-v4[1482807]: dynamically started ssrc 1,422,605,731
+```
+
+```text
+{"detail":"radiod command failed on rtlsdr-v4 during tune (ssrc=1422605731). The channel was created/located but tune() never confirmed it landed on the requested frequency/preset; it may be left parked and will self-expire (~20s) if untouched. Retry, or raise the tune() timeout if this happens consistently on this node.: No status response received for SSRC 1422605731 within 5.0s"}
+```
+
+Same failure shape as every test before the conf change: fresh SSRC,
+`freq 0.000` at creation, one reply, then silence; `tune()` times out
+identically at 5.0s.
+
+### Interpretation
+
+**The conf change fixes only the one pre-declared, boot-time channel
+— it does not fix the actual `set_frequency` code path.** That path
+(`mcp-server/src/radiod_adapter.py`'s `_ensure_ssrc()`, via
+`ensure_channel()`/`create_channel()`) always creates a brand-new
+dynamic channel per request, using a deterministically-allocated SSRC
+computed from the request parameters — never the config-declared
+`ssrc=24920` channel. That dynamic-creation path still bootstraps new
+channels at `freq=0` regardless of what `[AD-HOC]`'s own `freq=` value
+says, meaning radiod's internal dynamic-channel `Template` (used for
+genuinely new SSRCs, as opposed to the channel actually declared and
+parsed from the conf file) is evidently independent of the conf's
+per-channel `freq=` setting. The freq=0 root-cause mechanism from the
+prior entry is still consistent with everything observed here — this
+result narrows *where* the fix needs to apply, not whether the
+mechanism is real.
+
+### Not Yet Tried: Retasking the Now-Healthy Boot Channel Directly
+
+One scenario the root-cause theory directly predicts should work and
+hasn't been tested yet: issuing a `tune()` against the **existing**
+`ssrc=24920` channel (alive, receiving real samples, not stuck at
+`freq=0`) instead of letting the adapter create a new dynamic SSRC.
+If that succeeds cleanly, it would further confirm the freq=0
+bootstrap mechanism and point toward a `mcp-server`-side fix (special-
+case `rtlsdr-v4` to retask the known boot-time SSRC rather than
+dynamically creating a new one) as a viable near-term workaround, even
+if the deeper radiod/`ka9q-radio` dynamic-`Template` behavior is never
+changed upstream.
+
+### Housekeeping
+
+- Two leaked ephemeral containers found and removed this session:
+  `sigliere-mcp-livetest` (from the "extended-timeout diagnostic"
+  entry, left running for roughly an hour past when it should have
+  been cleaned up) and `sigliere-mcp-livetest2` (this session's own,
+  once testing was done). Confirm with `podman ps -a` before assuming
+  no stray containers remain — this is the second time in this
+  investigation cleanup was assumed done but wasn't.
+- The persistent `sigliere-mcp.service` (dry-run) and the unrelated
+  `caddy`/`open-webui` containers were left running throughout,
+  untouched.

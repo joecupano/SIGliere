@@ -255,3 +255,350 @@ bash scripts/phase6-mcp-server-validate.sh
 [mcp-validate] set_frequency: {"dry_run":true,"node_id":"hackrf-vhf-uhf","frequency_hz":146520000.0,"mode":"nfm","note":"Dry-run enabled; no radiod change was sent.","role":"operator"}
 [mcp-validate] PASS
 ```
+
+## 2026-08-05 rtlsdr-v4 Live-Test Gap Investigation (Blocked)
+
+- Timestamp (UTC): 2026-08-05T06:34:00Z
+- Branch: main
+- Scope: attempt to extend the controlled non-dry-run `set_frequency` test
+  (already PASS for `hackrf-vhf-uhf` and `rx888-hf`) to the third node,
+  `rtlsdr-v4`.
+
+### Root Cause Found
+
+`node_id`/`radiod_instance` `rtlsdr-v4` in `mcp-server/config/nodes.json`
+did not correspond to any deployed radiod config on this host:
+
+- `radiod@rtlsdr-v4.service` was `loaded` (systemd instantiated it from
+  the generic `radiod@.service` template) but `inactive (dead)` —
+  never started.
+- That template requires `/etc/radio/radiod@rtlsdr-v4.conf`. Only
+  `radiod@rx888-hf.conf` and `radiod@hackrf-2m.conf` were deployed to
+  `/etc/radio/`; no `rtlsdr-v4` conf existed anywhere.
+- The repo's only RTL-SDR config is
+  `ingest/ka9q-radio/radiod@rtlsdr-adhoc.conf`, instance name
+  `rtlsdr-adhoc` — never deployed, and named differently from the
+  `nodes.json` entry.
+
+### Two Stale/Unconfirmed Claims in `radiod@rtlsdr-adhoc.conf`, Checked Against the Installed Build
+
+The conf file's own header flagged two prerequisites as unconfirmed.
+Checked both against `/opt/sovereign-sigint/src/ka9q-radio` (the source
+this host's `radiod`/`control` were built from):
+
+1. **"RTL-SDR under radiod needs the companion rtlsdrd daemon running
+   first" — found to be incorrect for this build.** `radiod` loads RTL-SDR
+   support directly via `src/rtlsdr.c` / `rtlsdr.so`, the same
+   plugin-driver pattern already working for `rx888-hf` and `hackrf-2m`
+   (no companion daemon for either). No `rtlsdrd` binary exists on this
+   host (`find / -iname '*rtlsdr*'` found none), and
+   `docs/SDR/rtlsdr.md` in the ka9q-radio source describes direct
+   `[global] hardware = rtlsdr` config with no separate daemon. This
+   blocker does not apply.
+2. **"Validate this file with: `radiod -I` ..." — the `-I` flag does not
+   exist in this build.** `radiod`'s usage banner lists `[-I]`, but the
+   actual `getopt(argc, argv, "N:vV")` call in
+   `src/main.c` only recognizes `-N`, `-v`, `-V`. Confirmed live:
+   `radiod --help` errors on unknown option before reaching a `-I`
+   branch. There is no config-validate/dry-run flag on this build —
+   only starting the service actually exercises the conf.
+
+### Action Taken
+
+- Deployed `ingest/ka9q-radio/radiod@rtlsdr-adhoc.conf` unchanged to
+  `/etc/radio/radiod@rtlsdr-v4.conf` (writable without root — `/etc/radio`
+  is `radio`-group-writable and this session's user is in that group).
+  `mcp-server/config/nodes.json` was intentionally left unchanged
+  (`node_id`/`radiod_instance` stay `rtlsdr-v4`), per the deployment
+  path chosen for this fix.
+
+### Blocked On
+
+Starting/enabling the service requires root; this session has no
+passwordless `sudo`:
+
+```text
+$ systemctl start radiod@rtlsdr-v4
+Failed to start radiod@rtlsdr-v4.service: Interactive authentication required.
+$ systemctl enable radiod@rtlsdr-v4
+Failed to enable unit: Interactive authentication required.
+```
+
+### Required Remediation (operator action, needs root)
+
+```bash
+sudo systemctl enable --now radiod@rtlsdr-v4
+systemctl status radiod@rtlsdr-v4   # expect: active (running)
+journalctl -u radiod@rtlsdr-v4 -n 40 --no-pager   # confirm no rtlsdr USB claim errors
+```
+
+Then re-run the same controlled non-dry-run pattern used for the other
+two nodes (see the RX-888 and hackrf-vhf-uhf sections above), targeting
+`rtlsdr-v4`. Suggested first frequency: pick a value with **no**
+existing fixed channel to genuinely exercise the freq=0 dynamic-channel
+path this conf relies on (unlike the hackrf test, which retasked a
+pre-existing `[2m-calling-146520]` channel — see Residual Notes below).
+
+### Residual Note — Untested Assumption Carried Forward
+
+The prior `hackrf-vhf-uhf` and `rx888-hf` live tests both succeeded, but
+neither is a clean precedent for `rtlsdr-v4`'s config shape:
+`146.520 MHz` matched an existing fixed `[2m-calling-146520]` channel in
+`radiod@hackrf-2m.conf`, and while `7.100 MHz usb` on `rx888-hf` did
+require the adapter to create a new channel, `rx888-hf` still has other
+fixed channels already running. `radiod@rtlsdr-adhoc.conf` has **zero**
+fixed channels — only a single `freq = 0` prototype — so this will be
+the first real test of `ka9q.RadiodControl.create_channel`/
+`ensure_channel` against an instance with no pre-existing channels at
+all. Treat a PASS here as new evidence, not a foregone conclusion.
+
+### `nodes.json` Gap Not Addressed by This Fix
+
+`rtlsdr-v4`'s entry in `mcp-server/config/nodes.json` still has no
+`status_address`, unlike the other two nodes (which got one explicitly
+during earlier remediation specifically to avoid depending on avahi
+discovery). If discovery is flaky when the live test is run, that is
+the next thing to fix — add an explicit `status_address` for
+`rtlsdr-v4` matching whatever `status = rtlsdr-adhoc-status.local`
+resolves to on this LAN.
+
+## 2026-08-05 rtlsdr-v4 Service Start + Live Test (Service PASS, Control Action FAIL)
+
+- Timestamp (UTC): 2026-08-05T06:40:00Z–06:52:00Z
+- Branch: main
+- Scope: continuation of the above investigation, after the operator ran
+  `sudo systemctl enable --now radiod@rtlsdr-v4` on this host.
+
+### Service Start Result: PASS, With Explained Warnings
+
+`journalctl -u radiod@rtlsdr-v4` showed the service reach
+`active (running)` with hardware attached:
+
+```text
+Dynamically loading rtlsdr hardware driver from /usr/local/lib/ka9q-radio/rtlsdr.so
+[rtlsdr] key "iface" not found
+[rtlsdr] key "status" not found
+[rtlsdr] key "data" not found
+[rtlsdr] key "ssrc" not found
+[rtlsdr] key "gainmode" not found
+Found 1 RTL-SDR device: #0 (Generic RTL2832U OEM): Realtek RTL2838UHIDIR 00000001
+Using RTL-SDR #0, serial 00000001
+Found Rafael Micro R820T tuner
+[R82XX] PLL not locked!  (x3, during init before first lock)
+Exact sample rate is: 1000000.026491 Hz
+sovereign-sigint RTL-SDR ad hoc single-frequency tasking, samprate 1,000,000 Hz, agc 0, gain 0, ...
+rtlsdr thread running
+[ad-hoc] 1 channels started
+1 total demodulators started
+```
+
+**The five `[rtlsdr] key "..." not found` warnings are explained, not a
+regression:** those five keys (`iface`, `status`, `data`, `ssrc`,
+`gainmode`) were set inside the `[rtlsdr]` hardware section, which this
+build's `rtlsdr.so` front-end driver does not parse those keys from
+(confirmed by contrast: `radiod@rx888-hf.conf` sets the identical key
+names in its `[rx888]` hardware section and that driver *does* accept
+them, with no warnings). What actually matters — `[global] status`
+(the control channel) and `[AD-HOC] data` (the demodulated-audio
+channel) — are in different sections, were not flagged, and were
+confirmed live via `avahi-publish-address`:
+
+```text
+rtlsdr-adhoc-status.local  -> 239.234.164.106  (port 5006, _ka9q-ctl._udp, TTL=1)
+rtlsdr-adhoc-pcm.local     -> 239.152.12.134   (port 5004, _rtp._udp, TTL=0)
+rtlsdr-v4-pcm.local        -> 239.86.23.217    (auto-named; front-end raw-IQ stream naming was dropped along with the [rtlsdr]-section keys, cosmetic only)
+```
+
+Added `"status_address": "239.234.164.106"` to `rtlsdr-v4` in
+`mcp-server/config/nodes.json`, matching the remediation already applied
+to the other two nodes.
+
+### Live `set_frequency` Result: FAIL (new failure mode, not the earlier `ka9q.Client` bug)
+
+Ran the same ephemeral-container, non-dry-run pattern used for the
+other two nodes (`SIGLIERE_MCP_DRY_RUN=false`, test operator token),
+targeting `rtlsdr-v4` at 146.520 MHz `nfm`:
+
+```text
+POST /set_frequency {"node_id":"rtlsdr-v4","frequency_hz":146520000,"mode":"nfm"}
+HTTP=500
+{"detail":"radiod command failed: No status response received for SSRC 1345155156 within 5.0s"}
+```
+
+Reproduced twice, identically (same SSRC both times — `allocate_ssrc()`
+is a deterministic hash of the request parameters, not random, so this
+is a stable repro, not a flake). Container logs show radiod *is*
+sending something back — repeated `Radiod reporting TTL=0 for SSRC
+1677018585: Multicast data restricted to localhost loopback only!` (14–17
+times per attempt) — but never the specific status reply the client's
+wait loop is matching on for either SSRC it tries
+(`ensure_channel`'s auto-allocated SSRC `1345155156`, then the
+`create_channel` fallback's SSRC `1677018585`). `radiod`'s own journal
+(`journalctl -u radiod@rtlsdr-v4`) recorded **zero** new lines during
+either attempt — inconclusive on its own since the unit isn't run with
+`-v`, but consistent with the command not being acted on the way it is
+for the other two nodes.
+
+### Interpretation
+
+This lines up with the exact gap `radiod@rtlsdr-adhoc.conf`'s own
+header flagged as unconfirmed from the start: tasking a `freq = 0`
+"prototype" channel (this instance's *only* channel — no fixed channel
+list, unlike `rx888-hf`/`hackrf-2m` which both have other channels
+already running) via `ka9q-python`'s generic
+`ensure_channel`/`create_channel` has not been shown to work the same
+way it does against an instance with pre-existing channels. This is new
+information, not a repeat of the earlier `ka9q.Client` API-mismatch bug
+(that one is fixed and stays fixed).
+
+### Attempted Diagnostic, Blocked
+
+Tried a packet capture on the control port (`tcpdump -i any udp port
+5006`) during a retry to see whether radiod is replying at the wire
+level at all. Blocked: `tcpdump: You don't have permission to perform
+this capture on that device` — this session has no raw-capture
+capability, same root gap as the systemd start earlier.
+
+### Required Remediation (operator action, needs root)
+
+1. `sudo tcpdump -i any -n udp port 5006 -c 40` while re-running the
+   `set_frequency` call above, to confirm whether radiod is replying to
+   the specific command packet at all, or only sending unrelated
+   periodic status broadcasts.
+2. Consider restarting `radiod@rtlsdr-v4` with `-v` (`ExecStart=... -N
+   %i -v /etc/radio/radiod@%i.conf`, temporary override) to get
+   per-command logging in `journalctl` during a retry.
+3. Do not add `[freq-name]` fixed-channel sections to
+   `radiod@rtlsdr-adhoc.conf` as a workaround without deciding that
+   trade-off deliberately — the whole point of this conf is staying
+   frequency-agnostic per its own header; converting it to a
+   fixed-channel config changes what this node is for.
+
+### Current Status
+
+- `radiod@rtlsdr-v4.service`: **running**, hardware attached, control
+  channel and demod-audio channel confirmed live over mDNS/multicast.
+- `mcp-server/config/nodes.json`: updated with `rtlsdr-v4`'s real
+  `status_address`.
+- Live `set_frequency` control action against `rtlsdr-v4`: **still
+  blocked** — new, more specific failure than before, root-level
+  packet capture needed to go further.
+
+## 2026-08-05 rtlsdr-v4 Root Cause Isolated: Network Ruled Out, Confirmation-Reply Gap Found
+
+- Timestamp (UTC): 2026-08-05T06:53:00Z–07:16:19Z
+- Branch: main
+- Scope: continuation of the investigation above, with operator-run root
+  diagnostics (packet capture, IGMP membership check, verbose radiod
+  restart) between each retry. `set_frequency` against `rtlsdr-v4` was
+  fired **eight times** total across this session (`07:03:31`, `07:03:32`
+  wave, `07:06:28`, `07:11:56`, `07:16:19`, plus earlier attempts logged
+  above) — every single one failed identically:
+  `No status response received for SSRC 1345155156 within 5.0s`
+  (same SSRC every time — `allocate_ssrc()` is a deterministic hash of
+  request parameters, confirming a stable repro, not a flake).
+
+### Network Layer: Ruled Out
+
+Three checks, in order, each closing off a plausible network-level
+explanation:
+
+1. **`tcpdump -i any host 239.234.164.106`** (the correct multicast
+   group and interface, after an earlier `-i lo`-only attempt wrongly
+   came back empty) showed our client's command packets (`56833 →
+   239.234.164.106:5006`) genuinely leaving the host on `eno1`,
+   alongside `rtlsdr-v4`'s own periodic heartbeat (`5006 → 5006`,
+   confirming the instance is alive and broadcasting). **Zero inbound
+   reply packets** in a full clean 20-second capture spanning two
+   command attempts.
+2. **IGMP membership** (`ip maddr show`) confirmed `239.234.164.106` is
+   properly joined — 2 users on `eno1`, also joined on `lo`. Group
+   membership and routing are intact; this isn't a join/routing
+   failure.
+3. Ruled out RTL-SDR hardware/PLL-retune as the cause too (the
+   competing hypothesis after finding `[R82XX] PLL not locked!` warnings
+   at startup) — see below, the verbose log shows radiod never even
+   attempts a retune.
+
+### Decisive Evidence: Verbose (`-v -v`) radiod Log During a Live Attempt
+
+Temporarily overrode `ExecStart` via a `--runtime` (non-persistent,
+`/run/`-only, gone on next reboot) systemd drop-in to add `-v -v`, then
+fired `set_frequency` again while tailing `journalctl -u
+radiod@rtlsdr-v4 -f` live:
+
+```text
+07:16:19 start_demod: ssrc 1,345,155,156, output rtlsdr-v4-pcm.local, demod 1, freq 0.000, preset fm, filter (-8,000,+8,000)
+07:16:19 dynamically started ssrc 1,345,155,156
+```
+
+**radiod received the command and created the channel — the same SSRC
+our client generated.** This rules out both the network layer (packet
+plainly arrived and was acted on) and the freq=0/prototype-tasking
+concern flagged in the conf's own header (dynamic channel creation
+against this instance works — it created one, on request, from
+nothing). But it started at **`freq 0.000`**, never retuned to the
+requested 146.520 MHz, and no further log line ever appears for this
+SSRC afterward.
+
+### Root Cause
+
+`mcp-server/src/radiod_adapter.py`'s `set_frequency()` flow is two
+separate steps: `_ensure_ssrc()` (calls `ensure_channel()`, then falls
+back to `create_channel()`) to establish the channel, **then**
+`control.tune(ssrc=ssrc, frequency_hz=..., ...)` to actually set the
+real frequency. `create_channel()` succeeded on radiod's side (per the
+log above) but its own creation-confirmation status reply never reached
+the client within the library's 5-second wait — and
+`_ensure_ssrc()`'s `create_channel()` branch has no `try/except` around
+it (unlike the `ensure_channel()` branch just above it, which does).
+The resulting `TimeoutError` propagates straight up through
+`_ensure_ssrc()` to `set_frequency()`'s outer handler, which wraps and
+re-raises it. **`control.tune()` is never called at all** — the
+channel is left parked at 0 Hz and self-expires per the conf's own
+`Template.lifetime` (~20s after last command, confirmed in
+`ka9q-radio`'s `radio.c`), leaving no persistent residue, but also
+never accomplishing the requested tune.
+
+This is a confirmation-reply delivery gap specific to newly, dynamically
+created channels on this instance — not the freq=0/prototype semantics
+originally suspected (ruled out — dynamic creation works), not a
+network/multicast problem (ruled out — packets arrive, group membership
+is correct), and not the RTL-SDR PLL/retune concern (ruled out — radiod
+never even reaches a retune step). Whether radiod's status-broadcast
+cadence for `rtlsdr-v4` is simply slower than the 5s client timeout
+(this instance runs one dormant channel vs. `rx888-hf`'s constant
+churn across 15+ channels, which may drive more frequent status
+broadcasts and mask the same underlying latency there) is the next
+thing to check — but that is a hypothesis, not confirmed; do not act on
+it without verifying against `ka9q-python`'s actual status-broadcast
+trigger logic first.
+
+### Required Remediation
+
+1. In `mcp-server/src/radiod_adapter.py`, wrap the `create_channel()`
+   fallback branch in `_ensure_ssrc()` with the same `try/except`
+   pattern already used for `ensure_channel()` above it, OR raise the
+   client-side confirmation timeout for this code path specifically —
+   pick one deliberately; don't silently swallow both branches' errors,
+   per this repo's fail-loud guardrail.
+2. Confirm whether raising the timeout (e.g. to 10–15s) alone resolves
+   this before changing error-handling behavior — cheaper fix if it
+   works, and tells us whether this is purely a latency mismatch or a
+   reply that never comes at all.
+3. Re-run this exact live test after either fix and require the full
+   round trip (`create_channel` + `tune`) to complete with the channel
+   actually landing on 146.520 MHz, not just channel creation.
+
+### Housekeeping
+
+- The `-v -v` verbose override lives at
+  `/run/systemd/system/radiod@rtlsdr-v4.service.d/override.conf`.
+  Because it was applied via the `--runtime` (`/run/`) path rather than
+  `/etc/`, it does **not** survive a reboot and needs no manual
+  cleanup — noting this so a future session doesn't go looking for
+  where verbose logging was "supposed" to have been reverted.
+- The ephemeral `sigliere-mcp-livetest` test container used for all
+  eight attempts in this session has been removed. The persistent
+  `sigliere-mcp` managed service (dry-run mode) was left untouched
+  throughout.

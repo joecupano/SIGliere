@@ -18,9 +18,7 @@ can stand up the same platform at their own location.
 **Working end to end.** The capture → database → AI loop is closed and
 reboot-durable, with three live AI data sources and calibrated RF sensors. See
 [docs/build-order.md](docs/build-order.md) for the phase-by-phase build and
-[docs/README.md](docs/README.md) for the full guide index. A companion
-classroom curriculum (article, deck, and 13 lab sessions) lives in
-[`classroom/`](classroom/).
+[docs/README.md](docs/README.md) for the full guide index.
 
 ## What it does
 
@@ -31,7 +29,7 @@ tools (native and external OpenAPI):**
 |---|---|---|
 | **RF occupancy** | What's active on the bands, when, how often? | `radiod` HF producer (wired, running) → occupancy DB |
 | **WiFi device intelligence** | What access points / clients were seen? | Kismet capture → kismetdb |
-| **Signal reference** | What *is* this signal? | Local mirror of the sigidwiki catalog |
+| **Signal reference** | What *is* this signal? | Local mirror of the [SIGIDwiki catalog](https://www.sigidwiki.com) |
 
 Plus a **vision-assisted identification workflow**: a local vision model
 describes an unknown signal's waterfall shape, the signal-reference tool
@@ -53,17 +51,18 @@ location-specific** — the guides teach how to re-derive them for your site.
 | HF SDR | RX-888 MkII (direct sampling) |
 | VHF/UHF SDR | HackRF One (2m, via radiod), RTL-SDR (ad hoc single-frequency tasking) |
 | WiFi capture | MT7612U (Kismet) |
-| Bluetooth / sub-GHz (future) | Ubertooth One, Evil Crow RF v2 |
+| Bluetooth / sub-GHz (future) | Ubertooth One |
 | OS | Ubuntu 24.04 Server |
 
 ## Architecture
 
-- **HF ingest** — [ka9q-radio](https://github.com/ka9q/ka9q-radio) (`radiod`)
+- **HF AI ingest** — [ka9q-radio](https://github.com/ka9q/ka9q-radio) (`radiod`)
   drives the RX-888 MkII directly, wideband-sampling HF and channelizing it
   into many simultaneous demodulated channels over IP multicast. Native
   RX-888 support; no SoapySDR layer.
-- **VHF/UHF ingest** — OpenWebRX+ provides the web waterfall/tuning UI for the
-  HackRF/RTL-SDR chain.
+- **VHF/UHF AI ingest** — — [ka9q-radio](https://github.com/ka9q/ka9q-radio) (`radiod`)
+  drives the HAckRF directly, wideband-sampling (20 MHz) of VHF or UHF and channelizing it into many simultaneous demodulated channels over IP multicast. Native HackRF support; no SoapySDR layer.
+  - **HF/VHF/UHF Interactive** — An RTL-SDR is dedicated for interactive use with OpenWebRX+ providin the web waterfall/tuning.
 - **Occupancy producers** — `radiod` (continuous HF, measuring power on each
   demodulated channel) is the one running as a continuous default: installed
   as a continuous systemd `--user` service by
@@ -106,10 +105,8 @@ location-specific** — the guides teach how to re-derive them for your site.
   Caddy fronts Open WebUI for LAN/TLS access.
 
 **GNU Radio** was used early for occupancy flowgraphs but has been **removed**:
-nothing in the working build needs it (direct-CLI captures replaced it, and
-OpenWebRX+ handles interactive viewing). Flowgraph/demodulation work is a
-deferred advanced topic, better suited to a desktop workstation — the reference
-flowgraphs remain in [`decode/gnuradio-flowgraphs/`](decode/gnuradio-flowgraphs/).
+nothing in the working build needs it (direct captures replaced it, and
+OpenWebRX+ handles interactive viewing using the RTL-SDR). Flowgraph/demodulation work is a deferred advanced topic, better suited to a desktop workstation — the reference flowgraphs remain in [`decode/gnuradio-flowgraphs/`](decode/gnuradio-flowgraphs/).
 
 ## Repo layout
 
@@ -129,7 +126,6 @@ openwebui-tools/    the three native AI tools (occupancy, Kismet, SigID)
 openapi-tools/      OpenAPI tool server for Open WebUI external-tool integration
 protocol-security/  Kismet and related protocol/WiFi tooling
 ai-ingest/          document/image/audio ingest for the RAG knowledge feature
-classroom/          teaching material — article, deck, and 13 lab sessions
 ```
 
 ## Not yet built / deferred

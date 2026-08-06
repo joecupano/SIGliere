@@ -707,3 +707,138 @@ unless/until confirmed otherwise; don't assume verbose logging was on.
 - Ephemeral `sigliere-mcp-livetest` container on port 8141 was used for
   this retest, kept separate from the persistent `sigliere-mcp.service`
   (dry-run, port 8140), which was left untouched.
+
+## 2026-08-06 rtlsdr-v4: Extended-Timeout Diagnostic + Targeted Packet Capture
+
+- Timestamp (host local, from journalctl): 2026-08-06T01:38:53–01:44:00
+- Branch: main
+- Commit: `64168c4`
+- Scope: two of the follow-ups queued by the retest above — (1) confirm
+  whether raising the client-side `tune()` timeout alone resolves the
+  failure, (2) packet capture targeting the retune command specifically,
+  not just channel creation. Both run via a standalone script
+  (`/tmp/rtlsdr_tune_diag.py`, not committed) calling `ka9q-python`
+  directly, bypassing the MCP HTTP/container layer entirely, against a
+  freshly restarted `radiod@rtlsdr-v4` with `-v -v` confirmed active
+  (unconfirmed in the prior retest).
+
+### Setup
+
+- `radiod@rtlsdr-v4` restarted with a `--runtime` `-v -v` override,
+  confirmed active this time via the journal's verbose startup banner.
+- `sudo tcpdump -i any -n host 239.234.164.106 -c 80 -w
+  /tmp/rtlsdr-v4-retune-capture.pcap` running concurrently.
+- Diagnostic: `ensure_channel(freq=146.520 MHz, preset=nfm, timeout=5.0)`
+  → on failure, `create_channel()` fallback → `tune(ssrc=..., timeout=15.0)`
+  (extended from the adapter's hardcoded 5.0s).
+
+### Result 1: Extended Timeout Does Not Help
+
+```text
+[+0.000s] calling ensure_channel(freq=146520000.0, preset=nfm)...
+[+6.002s] ensure_channel FAILED: Channel SSRC 1345155156 not verified within 5.0s. Requested: 146.520 MHz, nfm, 16000 Hz
+[+6.002s] create_channel returned ssrc=1345155156
+[+6.002s] calling tune(ssrc=1345155156, timeout=15.0)...
+[+21.003s] tune() FAILED even with 15.0s timeout: No status response received for SSRC 1345155156 within 15.0s
+```
+
+**Conclusion: raising the timeout from 5s to 15s made no difference.**
+This rules out pure latency (a reply that's merely slow) as the
+explanation — waited 3x longer, still nothing.
+
+### Result 2: Targeted Packet Capture
+
+`tcpdump -r /tmp/rtlsdr-v4-retune-capture.pcap -n`:
+
+```text
+01:43:40.382648 eno1  Out IP 192.168.173.65.5006 > 239.234.164.106.5006: UDP, length 14
+01:43:40.382740 lo    In  IP 127.0.0.1.33693 > 239.234.164.106.5006: UDP, length 305
+01:43:40.958763 eno1  Out IP 192.168.173.65.5006 > 239.234.164.106.5006: UDP, length 14
+01:43:41.383332 eno1  Out IP 192.168.173.65.39224 > 239.234.164.106.5006: UDP, length 40
+01:43:41.383599 eno1  Out IP 192.168.173.65.5006 > 239.234.164.106.5006: UDP, length 14
+... (repeated 192.168.173.65.39224 > 239.234.164.106.5006 outbound packets,
+     roughly every 1-1.5s, through 01:44:00.463729) ...
+```
+
+Full capture and journal cross-referenced against the `radiod` log for
+the same window:
+
+```text
+Aug 06 01:43:40 rubberduck radiod@rtlsdr-v4[1447076]: start_demod: ssrc 1,345,155,156, output rtlsdr-v4-pcm.local, demod 1, freq 0.000, preset fm, filter (-8,000,+8,000)
+Aug 06 01:43:40 rubberduck radiod@rtlsdr-v4[1447076]: dynamically started ssrc 1,345,155,156
+Aug 06 01:43:54 rubberduck radiod@rtlsdr-v4[1447076]: CPU usage: 0.7% since start, 0.7% in last 60.0 sec
+```
+(no further log lines for this SSRC, even with `-v -v` confirmed active)
+
+**Conclusions:**
+
+1. **Our commands genuinely leave the host, repeatedly** — outbound
+   packets on port 39224 roughly every 1-1.5s for the full ~20s window.
+   This rules out "the command isn't being sent" as an explanation.
+2. **Exactly one inbound packet arrived in the entire capture** — at
+   `01:43:40.382740`, on loopback, coincident with `dynamically started
+   ssrc 1,345,155,156` in the radiod log. This is radiod's one-time
+   creation announcement, not a reply to any later command. After it:
+   **zero** inbound traffic for the rest of the ~20s window, despite a
+   dozen-plus outbound retries.
+3. This reproduces and sharpens the 2026-08-05 "Root Cause Isolated"
+   entry's own capture finding (also zero inbound replies in a clean
+   20s window) — now with confirmation that requests keep leaving
+   throughout that window and still get nothing back, not just once.
+
+### Correction to Prior Session's Working Hypothesis
+
+The same diagnostic run printed client-side warnings —
+`Radiod reporting TTL=0 for SSRC 1677018585/2500/5000/14074: Multicast
+data restricted to localhost loopback only!` — repeated dozens of
+times, which the immediately preceding chat turn floated as a possible
+"noisy status channel" explanation. **That lead does not hold up:**
+none of that traffic appears anywhere in this capture, which was
+filtered to `host 239.234.164.106` (rtlsdr-v4's own status/control
+group). Whatever is generating those warnings is not on this node's
+status channel — most likely a shared/cached listener in `ka9q-python`
+picking up other radiod instances' broadcasts (`rx888-hf`,
+`hackrf-vhf-uhf`) or stale in-library state. Flagging this explicitly
+so a future session doesn't re-chase it as a live lead without first
+confirming it's actually sourced from `rtlsdr-v4`.
+
+### Working Hypothesis (Not Confirmed)
+
+`rtlsdr-v4` runs a single, currently idle/non-demodulating ad-hoc
+channel (parked at `freq 0.000`, `[R82XX] PLL not locked!` warnings
+seen at startup) — unlike `rx888-hf`'s 15+ constantly-churning fixed
+channels. If radiod's status re-broadcast for a channel is tied to
+active demodulator output rather than a fixed timer, an idle channel
+here may simply never produce a second status broadcast at all,
+regardless of client timeout — a structural gap for this specific
+node's usage pattern, not a transient network or latency issue. This
+is a hypothesis pending confirmation against `ka9q-radio`'s actual
+status-broadcast trigger logic (`/opt/sovereign-sigint/src/ka9q-radio`
+on this host) or a test with the native `control` CLI in place of
+`ka9q-python`, to isolate a library-level bug from radiod's own
+behavior. Do not act on this without verifying further.
+
+### Required Remediation / Next Steps
+
+1. Test with radiod's own native `control` CLI directly (bypassing
+   `ka9q-python` entirely) against the same SSRC/frequency, to isolate
+   whether this is a `ka9q-python`-specific gap or genuine radiod
+   behavior. **The exact `control` invocation syntax is unconfirmed on
+   this build** (flagged in `radiod@rtlsdr-adhoc.conf`'s own header and
+   `README.md`) — do not guess it; derive it from `control --help` or
+   the installed `ka9q-radio` source (`/opt/sovereign-sigint/src/ka9q-radio`)
+   before running it.
+2. If the native `control` CLI reproduces the same silence, escalate to
+   `ka9q-radio` upstream (or its source) to understand the intended
+   status-broadcast trigger for an idle/newly-created ad-hoc channel.
+3. If the native `control` CLI succeeds where `ka9q-python` doesn't,
+   this narrows to a `ka9q-python` library bug specific to idle-channel
+   verification, reportable upstream with this evidence.
+
+### Housekeeping
+
+- `/tmp/rtlsdr_tune_diag.py` and `/tmp/rtlsdr-v4-retune-capture.pcap`
+  are host-local scratch files, not committed to the repo.
+- The `-v -v` runtime override from this session lives at
+  `/run/systemd/system/radiod@rtlsdr-v4.service.d/override.conf` and
+  does not survive a reboot (same as the prior session's).

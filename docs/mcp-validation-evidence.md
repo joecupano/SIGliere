@@ -842,3 +842,170 @@ behavior. Do not act on this without verifying further.
 - The `-v -v` runtime override from this session lives at
   `/run/systemd/system/radiod@rtlsdr-v4.service.d/override.conf` and
   does not survive a reboot (same as the prior session's).
+
+## 2026-08-06 rtlsdr-v4 Root Cause: freq=0 Bootstrap Trap in `radiod` Itself
+
+- Timestamp (host local): 2026-08-06T02:06:54–02:21:28 (native `control`
+  TUI testing) plus source review immediately following
+- Branch: main
+- Scope: follow-up to the queued "test with the native `control` CLI"
+  remediation item above. Ended up isolating the actual root cause via
+  the reference `control` tool plus direct reading of the installed
+  `ka9q-radio` source (`/opt/sovereign-sigint/src/ka9q-radio/src/`,
+  the tree this host's `radiod`/`control` were built from), rather than
+  a clean pass/fail from the tool itself.
+
+### Native `control` Tool: Inconclusive as a Direct Comparison
+
+Selected the `rtlsdr-adhoc-status.local` instance, entered SSRC `1`,
+set Carrier to `145,250,000` via the `f` command (confirmed via source
+at `control.c:925` — `getentry("Carrier frequency: ", ...)`, one
+`sendto()` per keystroke, no batching). A targeted capture confirmed
+the command packet actually left the host (a 24-byte outbound packet
+distinct from the tool's routine 14-byte polls), but **zero** inbound
+replies arrived for the entire session — not even to the routine
+polls. Journal showed no `dynamically started ssrc` line at all for
+this session, unlike every `ka9q-python` attempt. This means the
+native-tool session diverged at an *earlier* step than the
+`ka9q-python` tests did (channel creation itself, not just the
+follow-up tune) — not a clean apples-to-apples comparison, and not
+conclusive on its own. Recorded so a future session doesn't re-run
+this exact test expecting a clean isolation result from it alone.
+
+### Source Trace: The Actual Mechanism
+
+`radio_status.c`'s command dispatcher (`radio_status()`) has two
+completely different paths depending on whether the target SSRC
+already exists:
+
+- **New SSRC** (`lookup_chan()` returns NULL): `create_chan()` →
+  `decode_radio_commands()` (applies the packet's fields) →
+  **`send_radio_status()` called synchronously, immediately** →
+  `start_demod()` → `dynamically started ssrc` logged if `Verbose`.
+  Guaranteed reply.
+- **Existing SSRC** (`lookup_chan()` finds it): the command is only
+  **queued** (`chan->status.command = cmd`) for the channel's own
+  per-block processing loop to pick up later. **No `send_radio_status()`
+  call anywhere in this branch.** Worse: if a previous command is
+  already queued and unprocessed, the new one is silently dropped
+  (`// An entry already exists. Drop ours, until we make this a
+  queue`) — no log, no reply, no error.
+
+The queue is drained in `radio.c`'s `downconvert()` (`radio.c:1358`
+region), called once per processing block for that channel. Critically,
+**the very top of that function**, before the command-queue check,
+is:
+
+```c
+if(chan->tune.freq == 0 && chan->lifetime > 0){
+  if(--chan->lifetime <= 0){
+    chan->demod_type = -1;  // No demodulator
+    ...
+    return -1; // terminate needed
+  }
+}
+// Process any commands and return status
+...
+if(chan->status.command != NULL){
+  restart_needed = decode_radio_commands(chan,chan->status.command,chan->status.length);
+  send_radio_status(&Frontend.metadata_dest_socket,&Frontend,chan); // Send status in response
+  ...
+}
+```
+
+(`Template.lifetime = DEFAULT_LIFETIME * 1000 / Blocktime; // If freq
+== 0, goes away 20 sec after last command`, `radio.c:383`.)
+
+So: a channel parked at `freq==0` is on a countdown to self-destruct,
+and that countdown check runs **before** the code that would process
+a queued command and reply to it, every single call. If the queued
+command that would move the channel off `freq==0` never gets a chance
+to run before the channel is torn down (or, more precisely per the
+finding below, never gets a chance to run *at all*), it dies
+unprocessed and unacknowledged.
+
+### Why the Channel Never Gets a Chance: RTL-SDR's Tuning Floor
+
+Every creation event in this investigation, across every tool, logged
+`freq 0.000` at `start_demod` — the channel is *born* at `freq=0`, an
+explicit "prototype" placeholder meant to be retuned by a second,
+separate command. But `mcp-server/config/nodes.json` declares
+`"min_hz": 24000000` for `rtlsdr-v4` — **0 Hz is below this hardware's
+real tunable floor.** Every single radiod startup for this instance
+has logged `[R82XX] PLL not locked!` and fallen back to `RTL freq
+28,800,000, tuner freq 28,800,000` — consistent with the RTL2832U/R820T
+tuner simply being unable to lock at the frequency the prototype
+channel starts at. The native `control` TUI's Signal panel stayed at
+`-inf`/`nan` across every field (Input, A/D, S/N, Output) for the
+entire session — consistent with this channel never having real
+samples flow through it at all, from creation onward.
+
+Put together: the ad-hoc conf's `freq=0` prototype pattern creates a
+channel at a frequency this hardware cannot actually tune to. If that
+prevents (or sufficiently delays) the channel's own per-block
+processing from running normally, the queued follow-up command that
+would move it to a real, receivable frequency never gets applied or
+acknowledged — independent of which client tool sent it, independent
+of timeout length. This is consistent with every result gathered
+across this entire investigation: `ka9q-python` at 5s and 15s timeouts,
+the native `control` tool, packet captures showing commands reliably
+leaving the host, and journal logs showing exactly one reply (at
+creation, `freq=0`) and silence thereafter in every case.
+
+### Why `rx888-hf` / `hackrf-vhf-uhf` Never Hit This
+
+Neither prior PASS test ever bootstrapped a channel starting at an
+out-of-range frequency: `hackrf-vhf-uhf`'s test retasked an
+already-tuned, already-running fixed channel (never at `freq=0` to
+begin with), and `rx888-hf` is an HF/6m receiver with no comparable
+tuning floor near DC. The `freq==0`-at-birth pattern is specific to
+`rtlsdr-v4`'s ad-hoc, no-fixed-channel-list design.
+
+### Status: Likely Root Cause Found, Not Yet a Confirmed Fix
+
+This is the most complete explanation gathered so far and is
+consistent with every piece of evidence collected across this whole
+investigation, but two things remain unconfirmed:
+
+1. Direct proof that `downconvert()` isn't running (or isn't running
+   normally) for this channel while parked at `freq=0` — inferred from
+   the Signal panel staying at `-inf`/`nan` and the consistent
+   `chan->lifetime` framing, not directly observed via a debugger or
+   added instrumentation.
+2. Whether `chan->lifetime` gets refreshed anywhere on receipt of a
+   command (the `radio.c:383` comment implies "20 sec after last
+   command," but no explicit `chan->lifetime = ...` reset was found in
+   the reviewed sections) — if it does reset on queueing rather than
+   only on successful processing, the exact failure mechanics differ
+   slightly from what's described above even though the outcome is the
+   same.
+
+### Suggested Remediation Direction (Not Yet Applied)
+
+The likely fix belongs in `ingest/ka9q-radio/radiod@rtlsdr-adhoc.conf`
+or radiod's own Template handling, not in `mcp-server`: don't let the
+ad-hoc prototype channel default to `freq=0` given this hardware's
+`min_hz` floor. Possible directions, none applied or validated yet:
+
+1. Give the ad-hoc Template a default frequency inside the hardware's
+   valid range (e.g., the tuner's own fallback of `28,800,000` Hz)
+   instead of `0`, so a freshly created channel is never parked
+   somewhere the hardware can't lock to.
+2. If `radiod` itself requires `freq=0` as the literal "unconfigured"
+   sentinel for this dynamic-channel pattern, the fix likely needs to
+   happen upstream in `ka9q-radio` (the lifetime-check-before-command-
+   processing ordering in `downconvert()`, or making channel creation
+   atomic with the first real frequency rather than a two-step
+   create-then-tune sequence) — outside what this repo controls.
+3. Do not attempt a client-side (`mcp-server`) workaround (e.g., just
+   raising the timeout further) without validating one of the above —
+   the evidence here indicates the channel may never get a chance to
+   process the command at all, not that it's merely slow.
+
+### Housekeeping
+
+- Source references are to
+  `/opt/sovereign-sigint/src/ka9q-radio/src/{radio_status.c,radio.c,control.c}`
+  on this host — the build this instance's `radiod`/`control` binaries
+  were compiled from. Line numbers are as of this session; re-verify
+  if the source tree is updated.

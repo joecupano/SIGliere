@@ -60,9 +60,12 @@ location-specific** — the guides teach how to re-derive them for your site.
   drives the RX-888 MkII directly, wideband-sampling HF and channelizing it
   into many simultaneous demodulated channels over IP multicast. Native
   RX-888 support; no SoapySDR layer.
-- **VHF/UHF AI ingest** — — [ka9q-radio](https://github.com/ka9q/ka9q-radio) (`radiod`)
-  drives the HAckRF directly, wideband-sampling (20 MHz) of VHF or UHF and channelizing it into many simultaneous demodulated channels over IP multicast. Native HackRF support; no SoapySDR layer.
-  - **HF/VHF/UHF Interactive** — An RTL-SDR is dedicated for interactive use with OpenWebRX+ providin the web waterfall/tuning.
+- **VHF/UHF AI ingest** — [ka9q-radio](https://github.com/ka9q/ka9q-radio) (`radiod`)
+  drives the HackRF directly, wideband-sampling (20 MHz) of VHF or UHF and
+  channelizing it into many simultaneous demodulated channels over IP
+  multicast. Native HackRF support; no SoapySDR layer.
+- **HF/VHF/UHF interactive** — An RTL-SDR is dedicated for interactive use
+  with OpenWebRX+ providing the web waterfall/tuning.
 - **Occupancy producers** — `radiod` (continuous HF, measuring power on each
   demodulated channel) is the one running as a continuous default: installed
   as a continuous systemd `--user` service by
@@ -101,6 +104,14 @@ location-specific** — the guides teach how to re-derive them for your site.
   `openwebui-tools/` for in-process workflows. Models:
   `qwen3:14b` (reasoning + tools), `gemma3:12b` (vision), `nomic-embed-text`
   (embeddings). Setup: [docs/openwebui-setup-guide.md](docs/openwebui-setup-guide.md).
+- **Control plane (MCP)** — `mcp-server/` (`sigliere_mcp_server.py`) exposes
+  SDR state and radiod-driven control (frequency/mode changes) as MCP tools,
+  built and validated separately from the OpenAPI query path — see
+  [docs/MCP-server-design.md](docs/MCP-server-design.md) and
+  [docs/mcp-validation-evidence.md](docs/mcp-validation-evidence.md). Runs as
+  the `sigliere-mcp` Podman Quadlet service; Open WebUI still connects via
+  OpenAPI until MCP tool support is stable in your deployed version — see
+  [docs/openapi-to-mcp-migration.md](docs/openapi-to-mcp-migration.md).
 - **Services** — rootless Podman Quadlet units + systemd `--user` timers;
   Caddy fronts Open WebUI for LAN/TLS access.
 
@@ -114,7 +125,7 @@ OpenWebRX+ handles interactive viewing using the RTL-SDR). Flowgraph/demodulatio
 docs/               build order, guides, and architecture notes (start at docs/README.md)
 scripts/            phased build + validation scripts (phase1 … phase7)
 systemd/            systemd --user service/timer units
-containers/         Podman Quadlet unit files (Open WebUI, Caddy)
+containers/         Podman Quadlet unit files (Open WebUI, Caddy, MCP server)
 ingest/
   ka9q-radio/       radiod configs: RX-888 (HF), HackRF (2m/70cm), RTL-SDR (ad hoc)
   openwebrx/        OpenWebRX+ profiles for HackRF/RTL-SDR
@@ -122,8 +133,9 @@ ingest/
 decode/             occupancy producers, SigMF writer, reference flowgraphs
 db/                 occupancy database schema + access layer
 reference/          SigID (sigidwiki) sovereign mirror
-openwebui-tools/    the three native AI tools (occupancy, Kismet, SigID)
+openwebui-tools/    native AI tools (occupancy, Kismet, SigID, Whisper transcription)
 openapi-tools/      OpenAPI tool server for Open WebUI external-tool integration
+mcp-server/         MCP control-plane server (SDR state/tuning via radiod)
 protocol-security/  Kismet and related protocol/WiFi tooling
 ai-ingest/          document/image/audio ingest for the RAG knowledge feature
 ```

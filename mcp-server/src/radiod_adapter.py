@@ -78,10 +78,15 @@ class RadiodAdapter:
         preset = self._mode_to_preset(mode)
         status_address = self._resolve_status_address(node)
         control = None
+        stage = "connect"
+        ssrc: int | None = None
         try:
             control = ka9q.RadiodControl(status_address=status_address)
+
+            stage = "allocate channel"
             ssrc = self._ensure_ssrc(control, frequency_hz=frequency_hz, preset=preset)
 
+            stage = "tune"
             # Prefer tune() when available; fallback to explicit setters for older APIs.
             if hasattr(control, "tune"):
                 control.tune(ssrc=ssrc, frequency_hz=frequency_hz, preset=preset, timeout=5.0)
@@ -90,7 +95,25 @@ class RadiodAdapter:
                 if hasattr(control, "set_preset"):
                     control.set_preset(ssrc=ssrc, preset=preset)
         except Exception as exc:
-            raise RuntimeError(f"radiod command failed: {exc}") from exc
+            detail = f"radiod command failed on {node.node_id} during {stage}"
+            if ssrc is not None:
+                detail += f" (ssrc={ssrc})"
+            if stage == "tune":
+                # The rtlsdr-v4 failure mode: create_channel()/ensure_channel()
+                # already created the channel server-side (radiod logs
+                # "dynamically started ssrc ..."), but this confirmation wait
+                # timed out before frequency/preset were verified applied. The
+                # channel is left parked (often at its create-time defaults)
+                # and self-expires (~20s) if nothing tunes it again -- so this
+                # is not a no-op failure, it's a real unconfirmed state.
+                detail += (
+                    ". The channel was created/located but tune() never "
+                    "confirmed it landed on the requested frequency/preset; "
+                    "it may be left parked and will self-expire (~20s) if "
+                    "untouched. Retry, or raise the tune() timeout if this "
+                    "happens consistently on this node."
+                )
+            raise RuntimeError(f"{detail}: {exc}") from exc
         finally:
             if control is not None:
                 try:
@@ -167,6 +190,25 @@ class RadiodAdapter:
         return None
 
     def _ensure_ssrc(self, control: Any, frequency_hz: float, preset: str) -> int:
+        """Get or create a channel SSRC for (frequency_hz, preset).
+
+        ensure_channel() is tried first -- it can reuse an existing channel
+        and verifies the result. If it fails (including a verification
+        timeout *after* it already created the channel server-side, the
+        rtlsdr-v4 failure mode: radiod logs "dynamically started ssrc ..."
+        but the confirmation reply doesn't reach the client in time), fall
+        back to create_channel(), which is fire-and-forget and doesn't wait
+        for a status reply.
+
+        Unlike the old version of this method, create_channel()'s branch is
+        no longer bare -- a failure there used to propagate uncaught past
+        this function (and past the caller's generic "unable to allocate"
+        message once both branches were exhausted), discarding whatever
+        ensure_channel() had already reported. Both branches now fail loud
+        with a specific message, and the ensure_channel() error is kept
+        instead of silently swallowed so the full failure chain is visible.
+        """
+        ensure_error: Exception | None = None
         if hasattr(control, "ensure_channel"):
             try:
                 result = control.ensure_channel(
@@ -177,13 +219,36 @@ class RadiodAdapter:
                 ssrc = self._extract_ssrc(result)
                 if ssrc is not None:
                     return ssrc
-            except Exception:
-                pass
+                ensure_error = RuntimeError(
+                    f"ensure_channel() returned no usable SSRC (raw result: {result!r})"
+                )
+            except Exception as exc:
+                ensure_error = exc
 
         if hasattr(control, "create_channel"):
-            result = control.create_channel(frequency_hz=frequency_hz, preset=preset)
+            try:
+                result = control.create_channel(frequency_hz=frequency_hz, preset=preset)
+            except Exception as exc:
+                suffix = f" after ensure_channel() also failed ({ensure_error})" if ensure_error else ""
+                raise RuntimeError(
+                    f"create_channel() failed for freq={frequency_hz} preset={preset}{suffix}: {exc}"
+                ) from exc
             ssrc = self._extract_ssrc(result)
             if ssrc is not None:
                 return ssrc
+            raise RuntimeError(
+                f"create_channel() returned no usable SSRC for freq={frequency_hz} "
+                f"preset={preset} (raw result: {result!r})"
+            )
 
-        raise RuntimeError("unable to allocate or discover channel SSRC")
+        if ensure_error is not None:
+            raise RuntimeError(
+                f"unable to allocate or discover channel SSRC for freq={frequency_hz} "
+                f"preset={preset}: ensure_channel() failed and no create_channel() "
+                f"fallback is available on this ka9q-python build ({ensure_error})"
+            ) from ensure_error
+        raise RuntimeError(
+            f"unable to allocate or discover channel SSRC for freq={frequency_hz} "
+            f"preset={preset}: neither ensure_channel() nor create_channel() is "
+            "available on this ka9q-python build"
+        )

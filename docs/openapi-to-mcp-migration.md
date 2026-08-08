@@ -16,6 +16,17 @@ stable in your deployed version.
 - Your Open WebUI tool connection type is OpenAPI-only.
 - You need browser-side connection validation and stable external-tool setup.
 
+**Confirmed hit 2026-08-08:** the operator's Open WebUI (0.11.0) only
+offers Type=OpenAPI in its Admin Panel — no MCP/Streamable HTTP option.
+The MCP server is a FastAPI app, so it already serves its own
+`/openapi.json` at `:8140` with the same role-gated endpoints — register
+it as an OpenAPI connection instead of standing up a second server:
+`bash scripts/openwebui-mcp-openapi-command.sh` prints both role-scoped
+blocks (Type=OpenAPI, Auth=Bearer). Not yet confirmed whether 0.11.0's
+OpenAPI connection form actually exposes a Bearer-token auth option (the
+existing `:8130` connection uses Auth=None, so this repo hadn't exercised
+that field before) — verify against the live form.
+
 ## Switch to MCP when all are true
 
 1. Your Open WebUI version supports MCP tool connections in your deployment.

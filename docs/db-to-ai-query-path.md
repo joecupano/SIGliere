@@ -1,7 +1,7 @@
 # The DB→AI Query Path — How the Local LLM Queries Occupancy
 
 **Status: WORKING.** The local LLM (via Open WebUI) can query the occupancy
-database in natural language and answers from real data the RX-888 captured.
+database in natural language and answers from real data the RX-888 and HackRF captured.
 This document records the working solution and why it is the way it is, since
 getting here involved three approaches and several dead ends worth not
 repeating.

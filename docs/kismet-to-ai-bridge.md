@@ -1,6 +1,6 @@
 # The Kismet→AI Bridge — WiFi Device Intelligence for the Local LLM
 
-**Status: WORKING.** The local LLM can query Kismet's captured WiFi data in
+The local LLM can query Kismet's captured WiFi data in
 natural language — access points, clients, MACs, SSIDs, signal, manufacturer —
 and answers from the real `kismetdb`. This is the **second AI data source**
 after occupancy, and the first *non-occupancy* one: it is device/protocol
@@ -85,14 +85,6 @@ Kismet's actively-written file in real time) would need the container to
 mount the live file directly; considered and set aside in favor of the
 staged-copy pattern, which keeps a stable path (`latest.kismet`) that
 doesn't change filename per session.
-
-## Validated
-
-Confirmed working end to end: the LLM called `kismet_summary` and reported the
-real capture (30 devices — 21 clients, 5 bridged, 4 APs, all IEEE802.11, with
-the correct multi-day time range), and `query_wifi_devices` returned the APs
-with manufacturers (Epigram, HPE) and extracted SSIDs (e.g. "Excelsior") and
-signal levels — all from the real kismetdb.
 
 ## Where this sits in the architecture
 

@@ -1,9 +1,9 @@
 # OpenWebRX+ SDR Device Quickstart
 
-Default profile sets for the three SDR device types in this build:
-HackRF (VHF/UHF/well-known services to 6GHz), RTL-SDR (its native tuner
-range), and RX-888 (HF). See `docs/build-order.md` Phase 6.4 for the
-install itself — this doc is device/profile configuration only.
+Default profile sets for RTL-SDR and its native tuner
+range. Mention of HackRF and RX-88 should you switch them from
+AI use to interactive use with openWebRX+. See `docs/build-order.md`
+for the install itself — this doc is device/profile configuration only.
 
 ## Before you start
 

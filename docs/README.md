@@ -6,6 +6,8 @@
   (six core phases plus Phase 7 for RF/protocol tooling): what each phase
   does, why, every real bug hit along the way and how it was fixed. The
   primary reference for building this system from scratch.
+  - **[build-detail.md](build-detail.md)** — deep-dive details on each of
+  the build phases. Worth a read to avoid pitfalls.
 - **[data-layout.md](data-layout.md)** — the `/data` directory structure
   and per-subsystem wiring: what lives where, ownership conventions, and
   the one deliberate exception (`/data/models`).

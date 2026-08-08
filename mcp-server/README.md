@@ -62,7 +62,8 @@ systemctl --user enable --now sigliere-mcp.service
 
 ## Open WebUI integration
 
-Generate manual tool settings:
+Generate manual tool settings (prints both the analyst and operator
+connection blocks; pass `analyst` or `operator` to print just one):
 
 ```bash
 bash scripts/openwebui-mcp-command.sh
@@ -92,13 +93,11 @@ python src/operator_cli.py tune hackrf-vhf-uhf 144390000 nfm
 
 ## Role provisioning prompts for Open WebUI
 
-Use this sequence after the tool is registered:
-
-1. Create user group: analyst (read-only MCP access).
-2. Create user group: operator (read + set_frequency access).
-3. Assign analyst users to analyst group only.
-4. Assign trusted operators to operator group.
-5. Store operator bearer tokens separately from analyst tokens.
+See `openwebui-role-prompts.md` for the full step-by-step sequence
+(register both connections → create both groups → scope access → assign
+users), current status, and the live confirmation that the MCP server
+enforces the analyst/operator boundary server-side regardless of how
+Open WebUI is configured.
 
 ## Notes
 

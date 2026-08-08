@@ -1431,3 +1431,60 @@ and radiod should radiod get patched":
    wrong) before restoring `rtlsdr-v4` to `nodes.json`.
 3. `sudo systemctl enable --now radiod@rtlsdr-v4` and re-check
    single-owner conflicts with OpenWebRX+ before re-enabling.
+
+## 2026-08-08 analyst/operator Open WebUI Role Provisioning — server-side ready, UI step still open
+
+- Timestamp (UTC): 2026-08-08T02:14:08Z
+- `sigliere-mcp.service`: active, running since 2026-08-06T04:45:11Z,
+  `SIGLIERE_MCP_DRY_RUN=true` (unchanged, still the default per this
+  repo's discipline).
+
+### What was found already done (contradicts the 2026-08-05 handoff doc)
+
+`PROJECT-STATE_20260805-2341.md` flagged `~/.config/sigliere/mcp.env`'s
+`SIGLIERE_MCP_TOKENS_JSON` as still holding placeholder tokens. Checked
+directly: it does not — both tokens are real, random, and were set
+2026-08-05T05:19:53Z (before that handoff doc was even written). Confirmed
+live rather than trusting either doc:
+
+| Token role | `GET /healthz` | `POST /set_frequency` |
+|---|---|---|
+| analyst | 200 | **403** (`role analyst lacks operator permission`) |
+| operator | 200 | **200** (dry-run, no hardware effect) |
+| (none/invalid) | 401 | — |
+
+This confirms the server-side role gate (`require_role`/`_mcp_auth` in
+`mcp-server/src/sigliere_mcp_server.py`) already enforces the
+analyst/operator boundary correctly and independently of anything done in
+Open WebUI.
+
+### What changed this session
+
+- `scripts/openwebui-mcp-command.sh`: generalized to print **both**
+  role-scoped connection blocks by default (was operator-only), each
+  token looked up live from `SIGLIERE_MCP_TOKENS_JSON` rather than a
+  second hardcoded env var. Fixed a latent bug this surfaced: `source`-ing
+  the env file stripped the JSON's double quotes via bash word-splitting
+  on the unquoted `VAR={"a":"b"}` line — now read via `grep`+`cut`
+  instead, bypassing `source` for that one value. Verified all three
+  invocation forms (no arg / `analyst` / `operator` / bad-arg usage error)
+  against the live `mcp.env`.
+- `mcp-server/openwebui-role-prompts.md`: rewritten from bare "prompts"
+  text into a concrete, ordered procedure (register both connections →
+  create both groups → scope access → assign users) plus the live
+  403/200 evidence above, so a misconfigured Open WebUI step is now
+  documented as a UX/exposure gap, not a safety hole.
+- `mcp-server/README.md`: pointed its role-provisioning section at the
+  rewritten doc instead of duplicating a shorter, now-stale sequence.
+
+### What's still open — needs the operator, not this agent
+
+Registering the two connections, creating the `analyst`/`operator`
+groups, and scoping the operator connection to the `operator` group all
+require an Open WebUI Admin Panel login. No credentials for that login
+exist anywhere in this repo or its configs (checked), and none should be
+stored there — this is the same "hand the operator the exact command"
+boundary as `sudo`/`git push`, just for a web login instead of a shell
+credential prompt. `mcp-server/openwebui-role-prompts.md` has the exact
+steps and paste-ready connection blocks (`bash
+scripts/openwebui-mcp-command.sh`) ready for the operator to run through.

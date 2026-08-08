@@ -45,6 +45,13 @@
   producer status, the calibration lesson, and honest current
   limitations. Start here for anything occupancy-related.
 
+- **[signal-path-sdr-to-occupancy-db.md](signal-path-sdr-to-occupancy-db.md)**
+  — technically detailed, stage-by-stage trace of the actual signal path:
+  antenna → RX-888/HackRF → radiod channelization → RTP multicast →
+  `radiod_occupancy_producer.py` → `occupancy_db.py` write path, naming
+  every script, config, and systemd unit involved. The mechanical "how"
+  companion to occupancy-guide.md's design "why."
+
 - **[db-to-ai-query-path.md](db-to-ai-query-path.md)** — how the local
   LLM queries the occupancy DB in natural language. Covers the active
   OpenAPI external-tool connection path for Open WebUI, native tool

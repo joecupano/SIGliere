@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from radiod_adapter import RadiodAdapter, RadiodNode
@@ -123,6 +124,28 @@ app = FastAPI(
         "Zero-trust role-gated control plane for radiod-backed SDR nodes. "
         "Use analyst role for read operations and operator role for tuning changes."
     ),
+)
+
+# Open WebUI's tool-server "Verify"/spec-fetch (and, per-version, its actual
+# tool calls) run as browser-side fetch() calls straight to this server, not
+# proxied through Open WebUI's own backend. Without CORS handling, the
+# browser's preflight OPTIONS request gets FastAPI's default 405 and the
+# fetch is aborted client-side before the real GET/POST ever happens —
+# confirmed live 2026-08-08 (OPTIONS /openapi.json -> 405 in this server's
+# own log, correlated with the browser's "Failed to connect" error, while
+# every non-browser curl/exec test against the same endpoints succeeded).
+# Wildcard origin is consistent with this repo's existing trust model for a
+# single-operator LAN box with no cloud exposure (see docs/security-hardening.md);
+# the real authorization boundary is still the per-request bearer token, not
+# CORS — this only unblocks the browser's preflight, it does not bypass
+# require_role()/_mcp_auth().
+_cors_origins = os.environ.get("SIGLIERE_MCP_CORS_ORIGINS", "*")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _cors_origins.split(",")] if _cors_origins != "*" else ["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

@@ -1488,3 +1488,65 @@ boundary as `sudo`/`git push`, just for a web login instead of a shell
 credential prompt. `mcp-server/openwebui-role-prompts.md` has the exact
 steps and paste-ready connection blocks (`bash
 scripts/openwebui-mcp-command.sh`) ready for the operator to run through.
+
+## 2026-08-08 OpenAPI Tool Server Connection — CORS Bug Found and Fixed, Live Connection Confirmed
+
+- Timestamp (UTC): 2026-08-08T03:41:29Z
+
+### Symptom
+
+Operator registered the MCP server (`:8140`) as an Open WebUI OpenAPI-type
+connection (per `scripts/openwebui-mcp-openapi-command.sh`'s printed
+values — `URL: http://192.168.173.65:8140`, `OpenAPI Spec URL:
+http://192.168.173.65:8140/openapi.json`, `Auth: Bearer` + token) and got
+**"Failed to connect to http://192.168.173.65:8140 OpenAPI tool server"**
+from Open WebUI's UI on Save/Verify.
+
+### Root cause (found by reading Open WebUI's own installed source, not guessed)
+
+This build's "Verify"/spec-fetch for an OpenAPI-type tool server connection
+runs as a **browser-side `fetch()` call straight to the tool server**, not
+proxied through Open WebUI's own backend (contrary to this repo's earlier
+assumption; `open_webui/routers/configs.py`'s `verify_tool_servers_config`
+exists but was never hit — zero matching requests in Open WebUI's own
+access log during two live reproduction attempts). The MCP server had no
+CORS handling, so the browser's mandatory preflight `OPTIONS
+/openapi.json` request hit FastAPI's default 405 and the browser aborted
+before ever sending the real GET. Confirmed directly in the MCP server's
+own log, correlated to the exact moment of each reproduction attempt:
+
+```
+192.168.73.65:xxxxx - "OPTIONS /openapi.json HTTP/1.1" 405 Method Not Allowed
+```
+
+— while every non-browser test against the same server (`curl` from the
+box, `podman exec open-webui curl ...` from inside Open WebUI's own
+container) succeeded throughout, which is what made this look like a
+reachability problem at first. It wasn't; both `host.containers.internal`
+and the LAN IP were always reachable. The one path never exercised until
+this point was a real browser doing a CORS preflight.
+
+### Fix
+
+`mcp-server/src/sigliere_mcp_server.py`: added `CORSMiddleware`
+(`allow_origins` from `SIGLIERE_MCP_CORS_ORIGINS`, default `*` — consistent
+with this repo's existing single-operator/no-cloud-exposure trust model;
+the real authorization boundary stays the per-request bearer token, which
+CORS does not touch). Rebuilt `localhost/sigliere-mcp:latest`, restarted
+`sigliere-mcp.service`.
+
+### Verification (all live, dry-run mode unchanged)
+
+| Check | Before | After |
+|---|---|---|
+| `OPTIONS /openapi.json` | 405 | **200** |
+| `Access-Control-Allow-Origin` header present | no | **yes (`*`)** |
+| `GET /healthz` no token | 401 | 401 (unchanged) |
+| `GET /healthz` analyst token | 200 | 200 (unchanged) |
+| `POST /set_frequency` analyst token | 403 | 403 (unchanged) |
+| `POST /set_frequency` operator token | 200 (dry-run) | 200 (dry-run, unchanged) |
+
+Operator confirmed the Open WebUI connection now saves/verifies
+successfully. Role gating regression-tested clean — the fix only unblocks
+the browser preflight, it changes nothing about who can call
+`set_frequency`.

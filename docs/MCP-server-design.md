@@ -9,7 +9,14 @@ This single document supersedes the former split between the design note and the
 The design is intended for the current build topology:
 
 - RX-888 via radiod for HF and wideband monitoring
-- HackRF via radiod for VHF/UHF channels
+- HackRF via radiod for VHF/UHF channels — **profile switching (2m/70cm/
+  operator-created) is now real, at the shell layer**: `scripts/sdr-mode.sh
+  hackrf {list|ai [profile]|new <name>|interactive}`, built 2026-08-11 (see
+  [signal-path-sdr-to-occupancy-db.md](signal-path-sdr-to-occupancy-db.md)).
+  This MCP design's `list_profiles`/`set_profile` tools below describe
+  exposing that same capability through MCP — not yet done, but the
+  underlying mechanism they'd wrap already exists and works, it's just not
+  reachable via MCP/HTTP yet.
 - ~~RTL-SDR via ad hoc or scripted tasking~~ — **tried and descoped**
   (2026-08-06): the client/MCP side was built and fixed, but a
   `ka9q-radio` bug limits a live-tasked channel to one control command

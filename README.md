@@ -49,7 +49,7 @@ location-specific** — the guides teach how to re-derive them for your site.
 | RAM | 64 GB |
 | GPU | NVIDIA GeForce RTX 5060 Ti (16 GB) |
 | HF SDR | RX-888 MkII (direct sampling) |
-| VHF/UHF SDR | HackRF One (2m, via radiod), RTL-SDR (interactive only, via OpenWebRX+) |
+| VHF/UHF SDR | HackRF One (2m or 70cm, one profile at a time, via radiod), RTL-SDR (interactive only, via OpenWebRX+) |
 | WiFi capture | MT7612U (Kismet) |
 | Bluetooth / sub-GHz (future) | Ubertooth One |
 | OS | Ubuntu 24.04 Server |
@@ -80,18 +80,36 @@ location-specific** — the guides teach how to re-derive them for your site.
   `scripts/phase6-occupancy-producer.sh`, confirmed on real hardware to
   actively grow the occupancy DB from live HF traffic.
   
-  **HackRF has its own `radiod` instance** (`ingest/ka9q-radio/radiod@hackrf-2m.conf`,
-  2m band only — HackRF's 20 MHz instantaneous bandwidth can't span 2m+70cm
-  in one capture; a 70cm config exists but isn't active, see
-  `radiod@hackrf-70cm.conf`), read by the same generalized
+  **HackRF has its own `radiod` instance, selectable between band profiles**
+  (`ingest/ka9q-radio/radiod@hackrf-2m.conf`, `radiod@hackrf-70cm.conf`, or
+  any operator-created one — HackRF's 20 MHz instantaneous bandwidth can't
+  span 2m+70cm in one capture, and it's a single-owner USB device, so only
+  one profile runs at a time). `scripts/sdr-mode.sh hackrf list` shows
+  what's available and which is active; `sudo scripts/sdr-mode.sh hackrf ai
+  [profile]` switches to one (omit `profile` to reaffirm whichever is
+  already active); `scripts/sdr-mode.sh hackrf new <name>` scaffolds a new
+  profile (structure only — it does not invent channel frequencies for
+  you). Whichever profile is active is read by the same generalized
   `decode/radiod_occupancy_producer.py --device hackrf`, run by
   `systemd/radiod-occupancy-hackrf.service` (installed by
-  `scripts/phase6-hackrf-occupancy-producer.sh`).
-  
-  This path is verified to receive the live multicast RTP audio stream and report real channel  power values for the five 2m channels; the current threshold remains a
-  placeholder until calibrated against a known-quiet vs. known-active
-  channel, but the transport and parser are working. Toggled together with
-  `sudo scripts/sdr-mode.sh hackrf {ai|interactive}`. 
+  `scripts/phase6-hackrf-occupancy-producer.sh`) — the producer
+  auto-detects the active profile on every sweep, so switching profiles
+  doesn't require restarting it.
+
+  HackRF driver support is confirmed working on this build (device found,
+  independently cross-checked with the stock `hackrf_info` tool). A real
+  config bug was found and fixed 2026-08-11: `radiod@hackrf-2m.conf`'s
+  `mix-gain` key was silently ignored (not a key this `radiod` build
+  recognizes — `mixer-gain` is) and `lna-gain` was never a 0-40dB value,
+  despite the name (it's a boolean, passed to
+  `hackrf_set_antenna_enable()`). Both fixed; see
+  `radiod@hackrf-2m.conf`'s header and `docs/mcp-validation-evidence.md`
+  for the full source-level trace. The five 2m channels are confirmed
+  receiving the live multicast RTP audio stream and reporting real channel
+  power values; the occupancy threshold remains an uncalibrated
+  placeholder — a live sweep found suspiciously uniform readings across
+  every channel simultaneously, cause not yet isolated (the gain bug above
+  was ruled out), so don't trust ACTIVE/quiet calls from it yet.
   
   **RTL-SDR is OpenWebRX+-only** (decided after the ad hoc AI-tasking
   path below was tried and abandoned), so there is no producer writing

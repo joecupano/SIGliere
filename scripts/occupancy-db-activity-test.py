@@ -58,7 +58,11 @@ DEFAULT_CONF_DIR = _REPO_ROOT / "ingest" / "ka9q-radio"
 # Reuse the producer's own device->source_type/source_device/config mapping
 # rather than re-guessing it here.
 sys.path.insert(0, str(_REPO_ROOT / "decode"))
-from radiod_occupancy_producer import DEVICE_PROFILES  # noqa: E402
+from radiod_occupancy_producer import (  # noqa: E402
+    DEVICE_PROFILES,
+    HACKRF_INSTANCE_PROFILES,
+    discover_hackrf_instances,
+)
 
 # Every source_type radiod_occupancy_producer.py writes starts with this
 # prefix ('radiod', 'radiod-hackrf', 'radiod-rtlsdr'). Legacy scan-based
@@ -121,6 +125,30 @@ def user_unit_active(unit: str) -> bool | None:
     return result.stdout.strip() == "active"
 
 
+def hackrf_instance_stats(conn: sqlite3.Connection, source_type: str, source_device: str,
+                           stem: str, recent_cutoff: float) -> sqlite3.Row:
+    """DB stats for sightings tagged with this specific HackRF instance/
+    band-profile via metadata_json's "radiod_instance" field (added to
+    run_once() 2026-08-11 — see decode/radiod_occupancy_producer.py).
+    Needed because every HackRF profile shares source_device="hackrf-one"
+    (same physical device), so (source_type, source_device) alone can't
+    tell a hackrf-2m sighting apart from a hackrf-70cm one. Rows written
+    before the tag existed have no "radiod_instance" key and won't match
+    any instance here — undercounts pre-2026-08-11 history, which is
+    correct (there's no way to retroactively attribute those rows), not
+    a bug."""
+    return conn.execute(
+        """
+        SELECT COUNT(*) AS n, MAX(last_seen_sec) AS last_sec,
+               SUM(CASE WHEN last_seen_sec >= ? THEN 1 ELSE 0 END) AS recent_n
+        FROM sightings
+        WHERE source_type = ? AND source_device = ?
+          AND json_extract(metadata_json, '$.radiod_instance') = ?
+        """,
+        (recent_cutoff, source_type, source_device, stem),
+    ).fetchone()
+
+
 def discover_ka9q_configs(conf_dir: Path) -> list[str]:
     """Config stems for every radiod@*.conf in ingest/ka9q-radio/ — the
     ka9q-radio SDRs this repo has a config for, independent of whether
@@ -129,11 +157,33 @@ def discover_ka9q_configs(conf_dir: Path) -> list[str]:
 
 
 def profile_by_config_name() -> dict[str, tuple[str, dict]]:
-    """Map a radiod conf's filename -> (DEVICE_PROFILES key, profile)."""
-    return {
-        Path(profile["config"]).name: (key, profile)
-        for key, profile in DEVICE_PROFILES.items()
-    }
+    """Map a radiod conf's filename -> (DEVICE_PROFILES key, profile).
+
+    HackRF is a special case: DEVICE_PROFILES["hackrf"] deliberately has
+    no "config" key — unlike rx888/rtlsdr, it can run any of several band
+    profiles at runtime (see `scripts/sdr-mode.sh hackrf list/ai/new`).
+    Build an entry for every discovered radiod@hackrf-*.conf here, using
+    HACKRF_INSTANCE_PROFILES' per-instance override where one exists,
+    else the "hackrf" base entry — the same fallback
+    decode/radiod_occupancy_producer.py's own resolve_hackrf_profile()
+    uses.
+    """
+    by_name: dict[str, tuple[str, dict]] = {}
+    for key, profile in DEVICE_PROFILES.items():
+        if "config" not in profile:
+            continue  # "hackrf" — handled below, per discovered instance
+        by_name[Path(profile["config"]).name] = (key, profile)
+
+    hackrf_base = DEVICE_PROFILES.get("hackrf", {})
+    for stem in discover_hackrf_instances():
+        override = HACKRF_INSTANCE_PROFILES.get(stem, {})
+        by_name[f"radiod@{stem}.conf"] = ("hackrf", {
+            "source_type": hackrf_base.get("source_type", "radiod-hackrf"),
+            "source_device": hackrf_base.get("source_device", "hackrf-one"),
+            "threshold_dbfs": override.get("threshold_dbfs", hackrf_base.get("threshold_dbfs", -30.0)),
+            "calibrated": override.get("calibrated", hackrf_base.get("calibrated", False)),
+        })
+    return by_name
 
 
 def main() -> int:
@@ -264,6 +314,7 @@ def main() -> int:
         configured_stems = discover_ka9q_configs(args.conf_dir)
 
     profiles = profile_by_config_name()
+    hackrf_stems = set(discover_hackrf_instances(args.conf_dir)) if args.conf_dir.exists() else set()
     radiod_recent_total = 0
 
     for stem in configured_stems:
@@ -279,7 +330,24 @@ def main() -> int:
         _, profile = match
         source_type = profile["source_type"]
         source_device = profile["source_device"]
-        db_row = row_by_key.get((source_type, source_device))
+
+        if stem in hackrf_stems:
+            # HackRF instances all share source_device="hackrf-one" (same
+            # physical device, different band profile) -- (source_type,
+            # source_device) alone can't tell hackrf-2m sightings apart
+            # from hackrf-70cm ones, so row_by_key would show the SAME
+            # numbers for every HackRF profile regardless of which one is
+            # actually active. Use the per-sighting "radiod_instance" tag
+            # in metadata_json instead (added to run_once() 2026-08-11 —
+            # see decode/radiod_occupancy_producer.py). Rows written
+            # before that tag existed won't match ANY instance query, so
+            # counts here undercount pre-2026-08-11 history — expected,
+            # not a bug; there is no way to retroactively attribute those.
+            db_row = hackrf_instance_stats(conn, source_type, source_device, stem, recent_cutoff)
+            if db_row["n"] == 0:
+                db_row = None
+        else:
+            db_row = row_by_key.get((source_type, source_device))
 
         unit = KA9Q_PRODUCER_UNITS.get(source_type)
         if unit is None:
@@ -295,14 +363,20 @@ def main() -> int:
 
         if db_row is None:
             print(f"  {stem:16} source_type={source_type} source_device={source_device}")
-            print(f"                   DB: NEVER seen a sighting for this source")
+            if stem in hackrf_stems:
+                print(f"                   DB: no sighting tagged specifically as "
+                      f"'{stem}' (instance tagging only exists for rows written "
+                      f"2026-08-11 or later — see the note above)")
+            else:
+                print(f"                   DB: NEVER seen a sighting for this source")
             print(f"                   producer service: {unit_state}")
         else:
             age = now - db_row["last_sec"]
             status = "ACTIVE" if db_row["recent_n"] > 0 else "quiet"
             radiod_recent_total += db_row["recent_n"]
+            tagged = " tagged as this instance" if stem in hackrf_stems else ""
             print(f"  {stem:16} source_type={source_type} source_device={source_device}")
-            print(f"                   DB: {db_row['n']} sightings, last "
+            print(f"                   DB: {db_row['n']} sightings{tagged}, last "
                   f"{fmt_ts(db_row['last_sec'])} ({fmt_age(age)} ago) -> {status}")
             print(f"                   producer service: {unit_state}")
             if status == "quiet" and unit_state.endswith(": active"):

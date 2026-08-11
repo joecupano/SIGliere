@@ -72,7 +72,9 @@ _KA9Q_CONF_DIR = _REPO_ROOT / "ingest" / "ka9q-radio"
 sys.path.insert(0, str(_REPO_ROOT / "decode"))
 from radiod_occupancy_producer import (  # noqa: E402
     DEVICE_PROFILES,
+    HACKRF_INSTANCE_PROFILES,
     DEFAULT_WINDOW_SEC,
+    discover_hackrf_instances,
     parse_channels,
     measure_channel_dbfs,
 )
@@ -89,10 +91,33 @@ def _profile_by_config_name() -> dict[str, dict]:
     Keyed by filename (not the DEVICE_PROFILES dict key) so this still
     works even though DEVICE_PROFILES' own key names ("rx888", "hackrf",
     "rtlsdr") don't equal the config stem for every device.
+
+    HackRF is a special case: unlike rx888/rtlsdr (one fixed config each),
+    DEVICE_PROFILES["hackrf"] deliberately has no "config" key — it can
+    run any of several band profiles (radiod@hackrf-2m.conf,
+    radiod@hackrf-70cm.conf, or an operator-created one, see
+    `scripts/sdr-mode.sh hackrf new`). Build an entry for EVERY discovered
+    HackRF conf here (active or not — this function doesn't know or care
+    which one radiod currently has loaded), using HACKRF_INSTANCE_PROFILES'
+    per-instance override if one exists, else the "hackrf" base entry —
+    the same fallback decode/radiod_occupancy_producer.py's own
+    resolve_hackrf_profile() uses.
     """
     by_name: dict[str, dict] = {}
     for profile in DEVICE_PROFILES.values():
+        if "config" not in profile:
+            continue  # "hackrf" — handled below, per discovered instance
         by_name[Path(profile["config"]).name] = profile
+
+    hackrf_base = DEVICE_PROFILES.get("hackrf", {})
+    for stem in discover_hackrf_instances():
+        override = HACKRF_INSTANCE_PROFILES.get(stem, {})
+        by_name[f"radiod@{stem}.conf"] = {
+            "source_type": hackrf_base.get("source_type", "radiod-hackrf"),
+            "source_device": hackrf_base.get("source_device", "hackrf-one"),
+            "threshold_dbfs": override.get("threshold_dbfs", hackrf_base.get("threshold_dbfs", DEFAULT_THRESHOLD_DBFS)),
+            "calibrated": override.get("calibrated", hackrf_base.get("calibrated", False)),
+        }
     return by_name
 
 

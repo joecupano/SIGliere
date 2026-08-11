@@ -135,23 +135,94 @@ DEVICE_PROFILES = {
         "calibrated": False,
     },
     "hackrf": {
-        "config": _KA9Q_CONF_DIR / "radiod@hackrf-2m.conf",
+        # Deliberately NO "config" key here, unlike rx888/rtlsdr above.
+        # Unlike those, HackRF can run any of several band profiles
+        # (radiod@hackrf-2m.conf, radiod@hackrf-70cm.conf, or an
+        # operator-created one via `scripts/sdr-mode.sh hackrf new`) —
+        # only one at a time (single-owner USB device), selected at
+        # runtime via `scripts/sdr-mode.sh hackrf ai <profile>`. This
+        # entry is the FALLBACK/base profile (source_type, source_device,
+        # default threshold) used for whichever instance is actually
+        # active; see resolve_hackrf_profile() below, which re-checks on
+        # every sweep so a live band switch is picked up without
+        # restarting this producer. HackRF's radiod driver support is
+        # confirmed working on this build as of 2026-08-11 (see
+        # docs/mcp-validation-evidence.md) — the "unconfirmed" caveat
+        # that used to live on this entry no longer applies.
         "source_type": "radiod-hackrf",
         "source_device": "hackrf-one",
-        # NOT yet field-calibrated, same reasoning as the rtlsdr profile
-        # above: the existing scan-based producer's -14 dBFS threshold
-        # (LNA 40 / VGA 48, hackrf_transfer raw-IQ RMS at a single retuned
-        # frequency) does not transfer to this radiod/demodulated-FM-audio
-        # signal chain. This profile is ALSO the least field-verified of
-        # the three — HackRF's radiod driver itself is unconfirmed on this
-        # build (see radiod@hackrf-2m.conf header: the project's own docs
-        # disagree on whether HackRF support is delivered or still
-        # forthcoming). Don't trust this profile's threshold, or that the
-        # config even loads, without a field check first.
+        # NOT yet field-calibrated for any HackRF instance — see
+        # HACKRF_INSTANCE_PROFILES below for per-instance overrides (none
+        # calibrated yet either). A live sweep 2026-08-11 found suspiciously
+        # uniform, near-ceiling dBFS across every 2m channel simultaneously
+        # — root cause not yet isolated (ruled out: the gain-config bug
+        # fixed that same session; see docs/mcp-validation-evidence.md).
+        # Don't trust ACTIVE/quiet calls from this threshold until that's
+        # resolved.
         "threshold_dbfs": -30.0,
         "calibrated": False,
     },
 }
+
+# Per-HackRF-instance calibrated threshold, keyed by instance stem (the
+# part of radiod@<stem>.conf between @ and .conf, e.g. "hackrf-2m",
+# "hackrf-70cm", or whatever an operator names a profile scaffolded via
+# `scripts/sdr-mode.sh hackrf new`). Any instance not listed here falls
+# back to DEVICE_PROFILES["hackrf"]'s base threshold, uncalibrated — that
+# is the correct default for a brand-new profile nobody has swept yet,
+# not a bug.
+HACKRF_INSTANCE_PROFILES: dict[str, dict] = {
+    # "hackrf-2m": {"threshold_dbfs": -30.0, "calibrated": False},
+}
+
+
+def discover_hackrf_instances(conf_dir: Path = _KA9Q_CONF_DIR) -> list[str]:
+    """Instance stems for every radiod@hackrf-*.conf found in conf_dir —
+    every HackRF band profile this repo currently has a config for,
+    independent of which (if any) is actually running."""
+    return sorted(p.stem.split("@", 1)[1] for p in conf_dir.glob("radiod@hackrf-*.conf"))
+
+
+def active_hackrf_instance(conf_dir: Path = _KA9Q_CONF_DIR) -> str | None:
+    """Instance stem of whichever radiod@hackrf-<stem> systemd unit is
+    currently active, or None if none is (HackRF in OpenWebRX+/interactive
+    mode, or systemctl couldn't be asked) — a normal, expected state, not
+    an error. HackRF is single-owner USB hardware, so at most one instance
+    should ever be active; if more than one somehow is, the first found
+    (sorted) wins and this is not treated as fatal."""
+    for stem in discover_hackrf_instances(conf_dir):
+        try:
+            result = subprocess.run(
+                ["systemctl", "is-active", f"radiod@{stem}"],
+                capture_output=True, text=True, timeout=5,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+            continue
+        if result.stdout.strip() == "active":
+            return stem
+    return None
+
+
+def resolve_hackrf_profile(conf_dir: Path = _KA9Q_CONF_DIR) -> dict | None:
+    """Build a DEVICE_PROFILES-shaped dict (plus 'instance') for whichever
+    HackRF radiod instance is currently active. Call this fresh on every
+    sweep (not once at startup) so a live band switch via
+    `scripts/sdr-mode.sh hackrf ai <profile>` takes effect without
+    restarting this producer. Returns None if no radiod@hackrf-* instance
+    is currently active — callers should skip that sweep, not error."""
+    instance = active_hackrf_instance(conf_dir)
+    if instance is None:
+        return None
+    base = DEVICE_PROFILES["hackrf"]
+    override = HACKRF_INSTANCE_PROFILES.get(instance, {})
+    return {
+        "config": conf_dir / f"radiod@{instance}.conf",
+        "source_type": base["source_type"],
+        "source_device": base["source_device"],
+        "threshold_dbfs": override.get("threshold_dbfs", base["threshold_dbfs"]),
+        "calibrated": override.get("calibrated", base["calibrated"]),
+        "instance": instance,
+    }
 
 
 def parse_channels(config_path: Path) -> list[dict]:
@@ -349,8 +420,17 @@ def _extract_pcm_s16(raw: bytes) -> list[int]:
 
 def run_once(db: OccupancyDB, channels: list[dict], window_sec: float,
              threshold_dbfs: float, source_type: str, source_device: str,
-             verbose: bool) -> int:
-    """One sweep across all channels. Returns count of channels recorded active."""
+             verbose: bool, radiod_instance: str | None = None) -> int:
+    """One sweep across all channels. Returns count of channels recorded active.
+
+    radiod_instance, when given, is recorded in metadata_json (not a
+    schema column — source_type/source_device stay as the stable
+    physical-device identity per db/occupancy_schema.sql). This is how a
+    HackRF sighting records WHICH band profile was active for it
+    (hackrf-2m vs hackrf-70cm vs an operator-created one), since
+    source_device stays "hackrf-one" regardless of which profile is
+    running — see resolve_hackrf_profile().
+    """
     active = 0
     for ch in channels:
         dbfs = measure_channel_dbfs(ch["stream"], window_sec, verbose)
@@ -363,15 +443,22 @@ def run_once(db: OccupancyDB, channels: list[dict], window_sec: float,
                   f"{ch['mode']:4} {fs} dBFS  {state}")
         if dbfs >= threshold_dbfs:
             active += 1
+            if radiod_instance:
+                metadata_json = (
+                    '{"channel":"%s","power_dbfs":%.1f,"threshold_dbfs":%.1f,"radiod_instance":"%s"}'
+                    % (ch["name"], dbfs, threshold_dbfs, radiod_instance)
+                )
+            else:
+                metadata_json = (
+                    '{"channel":"%s","power_dbfs":%.1f,"threshold_dbfs":%.1f}'
+                    % (ch["name"], dbfs, threshold_dbfs)
+                )
             db.record_sighting(
                 frequency_hz=ch["freq_hz"],
                 source_type=source_type,
                 source_device=source_device,
                 mode=ch["mode"],
-                metadata_json=(
-                    '{"channel":"%s","power_dbfs":%.1f,"threshold_dbfs":%.1f}'
-                    % (ch["name"], dbfs, threshold_dbfs)
-                ),
+                metadata_json=metadata_json,
             )
     return active
 
@@ -397,43 +484,86 @@ def main() -> int:
     ap.add_argument("--verbose", "-v", action="store_true")
     args = ap.parse_args()
 
-    profile = DEVICE_PROFILES[args.device]
-    config_path = args.config if args.config is not None else profile["config"]
-    threshold = args.threshold_dbfs if args.threshold_dbfs is not None else profile["threshold_dbfs"]
-    source_type = profile["source_type"]
-    source_device = profile["source_device"]
+    # HackRF is dynamically resolved (which band profile is currently
+    # active, re-checked every sweep) UNLESS the operator pinned an
+    # explicit --config, in which case it behaves exactly like rx888/
+    # rtlsdr always have: resolved once, fixed for the whole run.
+    dynamic_hackrf = (args.device == "hackrf" and args.config is None)
 
-    if not profile["calibrated"]:
-        print(f"WARNING: device '{args.device}' is NOT field-calibrated under "
-              f"radiod — its threshold ({threshold} dBFS) is a placeholder "
-              f"carried over from a different device profile's starting point, "
-              f"not a measured floor for this device. Do a --verbose run "
-              f"against a known-quiet vs. known-active channel and set "
-              f"--threshold-dbfs explicitly before trusting ACTIVE/quiet calls.")
+    if not dynamic_hackrf:
+        profile = DEVICE_PROFILES[args.device]
+        config_path = args.config if args.config is not None else profile["config"]
+        threshold = args.threshold_dbfs if args.threshold_dbfs is not None else profile["threshold_dbfs"]
+        source_type = profile["source_type"]
+        source_device = profile["source_device"]
 
-    if not config_path.exists():
-        print(f"ERROR: radiod config not found: {config_path}", file=sys.stderr)
-        return 1
+        if not profile["calibrated"]:
+            print(f"WARNING: device '{args.device}' is NOT field-calibrated under "
+                  f"radiod — its threshold ({threshold} dBFS) is a placeholder "
+                  f"carried over from a different device profile's starting point, "
+                  f"not a measured floor for this device. Do a --verbose run "
+                  f"against a known-quiet vs. known-active channel and set "
+                  f"--threshold-dbfs explicitly before trusting ACTIVE/quiet calls.")
 
-    channels = parse_channels(config_path)
-    if not channels:
-        print("ERROR: no audio channels parsed from config.", file=sys.stderr)
-        return 1
+        if not config_path.exists():
+            print(f"ERROR: radiod config not found: {config_path}", file=sys.stderr)
+            return 1
+
+        channels = parse_channels(config_path)
+        if not channels:
+            print("ERROR: no audio channels parsed from config.", file=sys.stderr)
+            return 1
+
+        print(f"radiod occupancy producer [{args.device}]: {len(channels)} channels, "
+              f"source_type={source_type}, threshold {threshold} dBFS, "
+              f"window {args.window}s"
+              + ("" if args.once else f", every {args.interval}s"))
+    else:
+        print(f"radiod occupancy producer [hackrf, auto-detected]: which "
+              f"radiod@hackrf-* instance is active is re-checked every sweep "
+              f"(scripts/sdr-mode.sh hackrf list/ai/new manages that). No "
+              f"instance active at a given moment is normal (e.g. HackRF in "
+              f"OpenWebRX+/interactive mode) — that sweep just records "
+              f"nothing, not an error. window {args.window}s"
+              + ("" if args.once else f", every {args.interval}s"))
 
     db = OccupancyDB(args.db)
-    print(f"radiod occupancy producer [{args.device}]: {len(channels)} channels, "
-          f"source_type={source_type}, threshold {threshold} dBFS, "
-          f"window {args.window}s"
-          + ("" if args.once else f", every {args.interval}s"))
 
     try:
         while True:
             t0 = time.time()
             if args.verbose:
                 print(f"-- sweep @ {time.strftime('%H:%M:%S')} --")
-            active = run_once(db, channels, args.window, threshold,
-                              source_type, source_device, args.verbose)
-            print(f"sweep complete: {active}/{len(channels)} channels active")
+
+            if dynamic_hackrf:
+                hp = resolve_hackrf_profile()
+                if hp is None:
+                    if args.verbose:
+                        print("  no radiod@hackrf-* instance currently active — skipping this sweep")
+                elif not hp["config"].exists():
+                    print(f"WARNING: {hp['config']} not found for active instance "
+                          f"'{hp['instance']}' — skipping this sweep", file=sys.stderr)
+                else:
+                    sweep_channels = parse_channels(hp["config"])
+                    if not sweep_channels:
+                        if args.verbose:
+                            print(f"  '{hp['instance']}': no audio channels parsed — skipping")
+                    else:
+                        sweep_threshold = (args.threshold_dbfs if args.threshold_dbfs is not None
+                                            else hp["threshold_dbfs"])
+                        if not hp["calibrated"] and args.verbose:
+                            print(f"  NOTE: '{hp['instance']}' is not field-calibrated — "
+                                  f"using placeholder threshold {sweep_threshold} dBFS")
+                        active = run_once(db, sweep_channels, args.window, sweep_threshold,
+                                           hp["source_type"], hp["source_device"], args.verbose,
+                                           radiod_instance=hp["instance"])
+                        print(f"sweep complete [{hp['instance']}]: "
+                              f"{active}/{len(sweep_channels)} channels active")
+            else:
+                active = run_once(db, channels, args.window, threshold,
+                                  source_type, source_device, args.verbose)
+                print(f"sweep complete: {active}/{len(channels)} channels active")
+
             if args.once:
                 break
             # Sleep the remainder of the interval (sweeps take real time).

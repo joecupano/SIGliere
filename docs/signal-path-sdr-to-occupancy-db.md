@@ -27,12 +27,16 @@ process can hold it open. This is enforced, not just documented:
   a live failure hit `LIBUSB_ERROR_BUSY` because the kernel hadn't
   finished tearing down the handle), then starts `radiod@rx888-hf` and
   the `radiod-occupancy.service` producer together.
-- **HackRF:** `sudo scripts/sdr-mode.sh hackrf {ai|interactive|status}`.
-  `ai` mode is two systemd layers toggled together: the system-level
-  `radiod@hackrf-2m` instance (owns the USB device) and the `--user`
-  `radiod-occupancy-hackrf.service` (reads its channels). Needs `sudo`
-  because the radiod layer is a system service, unlike the old
-  `--user`-only scan producer it replaced.
+- **HackRF:** `sudo scripts/sdr-mode.sh hackrf {ai [profile]|interactive|status}`,
+  plus `scripts/sdr-mode.sh hackrf list`/`new <name>` (no `sudo`, read-only
+  or repo-only). `ai` mode is two systemd layers toggled together: a
+  system-level `radiod@hackrf-<profile>` instance (owns the USB device —
+  `<profile>` is `2m`, `70cm`, or any operator-created one, single-owner
+  hardware so only one runs at a time) and the `--user`
+  `radiod-occupancy-hackrf.service` (auto-detects and reads whichever
+  profile is active). Needs `sudo` for `ai`/`interactive` because the
+  radiod layer is a system service, unlike the old `--user`-only scan
+  producer it replaced.
 
 If the wrong owner holds the device, every stage downstream still
 *runs* — it just reads silence. That is treated as correct behavior
@@ -42,9 +46,9 @@ If the wrong owner holds the device, every stage downstream still
 
 | | RX-888 MkII | HackRF One |
 |---|---|---|
-| Coverage in this build | HF, direct sampling, 0–30 MHz (64.8 MSPS mode) | VHF, 2m band only (144.39–146.52 MHz) |
-| Sample rate | `samprate = 64800000` in `[rx888]` (129.6 MSPS mode available, commented out, for 0–54 MHz incl. 6m — needs more CPU headroom, not enabled here) | `samprate = 8000000` in `[hackrf]` — the 2.13 MHz 2m span fits comfortably under HackRF's 20 Msps ceiling; no need to run near the top of its range |
-| Gain | `gain = 10`, `gainmode = high` — VGA-based front end, tuned against local noise floor, not a fixed LNA | `lna-gain = 40`, `mix-gain = 24` — carried over from the retired scan-based producer's calibration with the Comet GP-1 antenna |
+| Coverage in this build | HF, direct sampling, 0–30 MHz (64.8 MSPS mode) | VHF/UHF, ONE band profile at a time — 2m (144.39–146.52 MHz) or 70cm (see `radiod@hackrf-70cm.conf`), selected via `scripts/sdr-mode.sh hackrf ai <profile>` |
+| Sample rate | `samprate = 64800000` in `[rx888]` (129.6 MSPS mode available, commented out, for 0–54 MHz incl. 6m — needs more CPU headroom, not enabled here) | `samprate = 8000000` in `[hackrf]` (2m profile) — the 2.13 MHz 2m span fits comfortably under HackRF's 20 Msps ceiling; no need to run near the top of its range |
+| Gain | `gain = 10`, `gainmode = high` — VGA-based front end, tuned against local noise floor, not a fixed LNA | `lna-gain = 1`, `mixer-gain = 24` (2m profile, corrected 2026-08-11 — see the caveat below) |
 | Physical connection requirement | Native USB3 (blue port), not through a hub — at 64.8+ MSPS there's no margin for a flaky link | USB2/3, single-owner like every device in this build |
 | Firmware | `SDDC_FX3.img`, loaded onto the device at attach time by radiod | N/A (HackRF firmware is resident) |
 
@@ -55,13 +59,26 @@ of the ka9q-radio releases this build targets); `hardware = rx888` /
 `hardware = hackrf` in each config's `[global]` section selects the
 driver.
 
-**Known caveat (HackRF only):** whether a given `radiod` build actually
-exposes a working HackRF handler is *build-dependent* — the project's
-own upstream docs disagree on whether HackRF support is delivered or
-still forthcoming. `scripts/phase6-hackrf-occupancy-producer.sh`
-therefore performs a real go/no-go gate (`radiod <conf>` dry-run load,
-watching for a hardware-driver rejection) before installing anything
-downstream — see Stage 5.
+**HackRF driver support is confirmed working** on this build as of
+2026-08-11: `/usr/local/lib/ka9q-radio/hackrf.so` loads live, the device
+is found, and this was independently cross-checked with the stock
+`hackrf_info` tool (unrelated to ka9q-radio) reporting the same serial
+number. `scripts/phase6-hackrf-occupancy-producer.sh` still performs a
+go/no-go gate (`radiod <conf>` dry-run load, watching for a
+hardware-driver rejection) before installing anything downstream — see
+Stage 5 — as a defensive check for a different host/build where this
+might not hold, not because it's currently in doubt on this one.
+
+**Also confirmed this same pass — a real gain-config bug, since fixed:**
+`hackrf.c`'s recognized key is `mixer-gain`; `radiod@hackrf-2m.conf` used
+to say `mix-gain`, which `radiod` silently ignored (fell back to its own
+hardcoded default, which happened to be the same number the conf
+intended — it only *looked* correct). Separately, `lna-gain` is not a
+0-40dB gain at all despite the name — it's passed straight to
+`hackrf_set_antenna_enable()`, a boolean. See the corrected
+`radiod@hackrf-2m.conf`'s header and `docs/mcp-validation-evidence.md`'s
+2026-08-11 entries for the full source-level trace and the real
+key→hardware-call mapping.
 
 ## Stage 2 — `radiod` (ka9q-radio): wideband capture → channelization
 
@@ -95,7 +112,20 @@ exactly one front end:
   mDNS-addressed multicast stream — so a downstream consumer subscribes
   to exactly the channel it wants without parsing SSRCs.
 
-### `ingest/ka9q-radio/radiod@hackrf-2m.conf` — instance `hackrf-2m`
+### `ingest/ka9q-radio/radiod@hackrf-2m.conf` — instance `hackrf-2m`, ONE of several selectable HackRF profiles
+
+HackRF's 20 MHz instantaneous bandwidth can't span both 2m and 70cm at
+once (they're ~290 MHz apart), and single-owner USB means one `radiod`
+instance runs at a time — so unlike RX-888 (always `radiod@rx888-hf`),
+HackRF has multiple `radiod@hackrf-<profile>.conf` files and only ONE is
+ever the active instance. `scripts/sdr-mode.sh hackrf list` shows every
+profile this repo has (`2m`, `70cm`, or an operator-scaffolded one via
+`hackrf new <name>`) and which is currently active; `hackrf ai <profile>`
+switches. The occupancy producer (Stage 4) auto-detects whichever is
+active fresh on every sweep — it does not need reconfiguring when the
+profile changes.
+
+The `2m` profile specifically:
 
 - `status = hackrf-2m-status.local`.
 - 5 channels, all FM, all 15 kHz bandwidth, covering the 2m
@@ -103,11 +133,10 @@ exactly one front end:
   `vhf_uhf_key_freq_producer.py`: `2m-aprs` (144.390), `2m-144900`
   (144.900), `2m-145100` (145.100), `2m-iss-145825` (145.825, ISS
   packet), `2m-calling-146520` (146.520, national calling frequency).
-- 70cm is **deliberately out of scope** for this config — HackRF's 20
-  MHz instantaneous bandwidth can't span both 2m and 70cm at once
-  (they're ~290 MHz apart), and single-owner USB means one `radiod`
-  instance runs at a time. A parallel `radiod@hackrf-70cm.conf` exists
-  in the repo but is not the active instance.
+
+The `70cm` profile (`radiod@hackrf-70cm.conf`) exists in the repo with
+its own channel list, selectable the same way, but is not the currently
+active instance on this host as of this writing.
 
 Both configs are validated with `radiod -I <path>` before being
 trusted (a config/hardware-driver error surfaces there, not silently
@@ -154,9 +183,16 @@ via `DEVICE_PROFILES` (`decode/radiod_occupancy_producer.py:102`):
 
 | Profile | Config parsed | `source_type` | `source_device` | Threshold | Calibrated? |
 |---|---|---|---|---|---|
-| `rx888` | `ingest/ka9q-radio/radiod@rx888-hf.conf` | `radiod` | `rx888-hf` | **-30.0 dBFS** | **Yes** — against the demodulator's own ~-33 dBFS residual floor |
-| `hackrf` | `ingest/ka9q-radio/radiod@hackrf-2m.conf` | `radiod-hackrf` | `hackrf-one` | -30.0 dBFS | No — placeholder, field calibration pending |
-| `rtlsdr` | `ingest/ka9q-radio/radiod@rtlsdr-vhf.conf` | `radiod-rtlsdr` | `rtl-sdr` | -30.0 dBFS | No — no active occupancy role for RTL-SDR currently (see [occupancy-guide.md](occupancy-guide.md)) |
+| `rx888` | `ingest/ka9q-radio/radiod@rx888-hf.conf` (fixed) | `radiod` | `rx888-hf` | **-30.0 dBFS** | **Yes** — against the demodulator's own ~-33 dBFS residual floor |
+| `hackrf` | **NOT fixed** — resolved fresh each sweep by `resolve_hackrf_profile()` to whichever `radiod@hackrf-<profile>.conf` is currently active (`systemctl is-active`); see `HACKRF_INSTANCE_PROFILES` for per-profile threshold overrides | `radiod-hackrf` | `hackrf-one` | -30.0 dBFS (no profile has its own override yet) | No — placeholder, field calibration blocked on an unexplained uniform-reading issue (see the caveat above) |
+| `rtlsdr` | `ingest/ka9q-radio/radiod@rtlsdr-vhf.conf` (fixed — note: this filename is itself stale, the repo's actual file is `radiod@rtlsdr-adhoc.conf`, a known pre-existing mismatch) | `radiod-rtlsdr` | `rtl-sdr` | -30.0 dBFS | No — no active occupancy role for RTL-SDR currently (see [occupancy-guide.md](occupancy-guide.md)) |
+
+Since every HackRF profile shares `source_device=hackrf-one` (same
+physical device, different band), a sighting's `metadata_json` also
+carries `"radiod_instance": "<profile>"` (e.g. `hackrf-2m`) so which
+profile produced it is still recoverable — added 2026-08-11; sightings
+written before that date have no such tag and can't be retroactively
+attributed to a specific profile.
 
 ### 4a — parsing the channel list (`parse_channels()`)
 
@@ -290,18 +326,24 @@ periodic timer.
 
 | Unit | Scope | Installed by | Behavior |
 |---|---|---|---|
-| `radiod@hackrf-2m` | system | `scripts/phase6-hackrf-occupancy-producer.sh` (root half) | owns the HackRF USB device |
-| `radiod-occupancy-hackrf.service` | `--user` | same script (user half, via `TARGET_USER`/`SUDO_USER`) | `ExecStart=<venv-python> decode/radiod_occupancy_producer.py --device hackrf --interval 60` |
+| `radiod@hackrf-2m` (or `-70cm`, or an operator-created profile) | system | `scripts/phase6-hackrf-occupancy-producer.sh` (root half, `2m` profile only) or `scripts/sdr-mode.sh hackrf ai <profile>` (any profile, day-to-day switching) | owns the HackRF USB device |
+| `radiod-occupancy-hackrf.service` | `--user` | `scripts/phase6-hackrf-occupancy-producer.sh` (user half, via `TARGET_USER`/`SUDO_USER`) | `ExecStart=<venv-python> decode/radiod_occupancy_producer.py --device hackrf --interval 60` — this ExecStart line is the same regardless of which profile is active, since `--device hackrf` auto-detects it |
 
 This installer does more than the RX-888 one because it manages **two
-privilege domains and a hardware-support gate** in one run:
+privilege domains and a hardware-support gate** in one run — it exists
+to bootstrap the `2m` profile the first time; after that,
+`scripts/sdr-mode.sh hackrf ai <profile>` is the day-to-day way to
+switch between profiles (it handles the same deploy/enable/start steps,
+per-profile, without needing root split across two scripts):
 
 1. Confirms `radiod` is on `PATH` and the config exists.
 2. **Gate:** if `radiod@hackrf-2m` isn't already active, does a
    standalone `radiod /etc/radio/radiod@hackrf-2m.conf` load test and
    fails hard, with a specific rebuild hint, if HackRF support isn't
-   compiled into the local `radiod` build — this is a real go/no-go
-   check, not a formality, per the config file's own header caveat.
+   compiled into the local `radiod` build. HackRF support is confirmed
+   present on this host as of 2026-08-11 (see the caveat above), so this
+   check is now a defensive one for a different host/build, not a live
+   unknown here — but the gate itself hasn't been removed.
 3. Enables/starts the system-level `radiod@hackrf-2m` instance, then
    the `--user` producer service *as* `TARGET_USER` (using
    `sudo -u ... XDG_RUNTIME_DIR=... DBUS_SESSION_BUS_ADDRESS=...` to
@@ -333,13 +375,15 @@ Antenna → RX-888 MkII (64.8 MSPS, gain 10)
 **HackRF / 2m example — the national calling frequency:**
 
 ```
-Antenna (Comet GP-1) → HackRF One (8 Msps, LNA 40 / mix-gain 24)
+Antenna (Comet GP-1) → HackRF One (8 Msps, mixer-gain 24 / lna-gain 1 [boolean enable])
   → radiod@hackrf-2m demodulates [2m-calling-146520] as FM, publishes
     2m-calling-146520-pcm.local (RTP/5004)
-  → radiod_occupancy_producer.py --device hackrf joins that group, measures
-    power against the (still-placeholder) -30 dBFS threshold
+  → radiod_occupancy_producer.py --device hackrf auto-detects 'hackrf-2m' is the
+    active profile, joins that group, measures power against the
+    (still-placeholder) -30 dBFS threshold
   → if active: record_sighting(frequency_hz=146520000, source_type="radiod-hackrf",
-                                source_device="hackrf-one", mode="fm", ...)
+                                source_device="hackrf-one", mode="fm",
+                                metadata_json='{...,"radiod_instance":"hackrf-2m"}')
   → signal_key "146520000:fm" upserted in `signals`
 ```
 
@@ -390,14 +434,19 @@ retired MCP attempt — is in
 
 ## Honest gaps in this specific path
 
-- **HackRF's -30 dBFS threshold is an uncalibrated placeholder** — the
-  transport (RTP join, RMS extraction) is verified working against
-  live 2m traffic, but ACTIVE/quiet calls on that path shouldn't be
-  trusted until a known-quiet-vs-known-active calibration sweep is run
-  (see `docs/occupancy-guide.md`'s Calibration section for the method).
-- **HackRF driver support in `radiod` is build-dependent and not
-  universally confirmed** — Stage 5's install-time gate exists
-  specifically because this can silently not work on a given host.
+- **HackRF's -30 dBFS threshold is an uncalibrated placeholder, and
+  calibrating it is currently blocked** — the transport (RTP join, RMS
+  extraction) is verified working against live 2m traffic, but a live
+  sweep 2026-08-11 found suspiciously uniform, near-ceiling dBFS across
+  every 2m channel simultaneously regardless of frequency — not
+  plausible as real independent signal. A gain-config bug found the same
+  session was ruled out as the cause (fixing it didn't change the
+  reading). Root cause still open; don't trust ACTIVE/quiet calls from
+  this threshold until it's isolated (see `docs/mcp-validation-evidence.md`'s
+  2026-08-11 entries).
+- **HackRF driver support in `radiod` IS confirmed** on this build (see
+  the caveat above) — Stage 5's install-time gate is now a defensive
+  check for a different host/build, not a live unknown here.
 - **The producer parses the repo's copy of each `.conf`, not
   `/etc/radio`'s deployed copy** — the channel list Stage 4 sweeps can
   drift from what `radiod` is actually demodulating if one copy is
@@ -416,8 +465,15 @@ retired MCP attempt — is in
 
 - `decode/radiod_occupancy_producer.py` — the producer implementation
 - `db/occupancy_db.py`, `db/occupancy_schema.sql` — the write path and schema
-- `ingest/ka9q-radio/radiod@rx888-hf.conf`, `radiod@hackrf-2m.conf` — the channel configs
-- `scripts/sdr-mode.sh`, `scripts/rx888-mode.sh` — device-ownership arbitration
+- `ingest/ka9q-radio/radiod@rx888-hf.conf`, `radiod@hackrf-2m.conf`,
+  `radiod@hackrf-70cm.conf` — the channel configs (HackRF: one of
+  several selectable profiles, see `scripts/sdr-mode.sh hackrf list`)
+- `scripts/sdr-mode.sh`, `scripts/rx888-mode.sh` — device-ownership
+  arbitration; `sdr-mode.sh hackrf {list|ai|new}` specifically for
+  HackRF profile discovery/selection/creation
+- `scripts/ka9q-channel-activity-test.py`,
+  `scripts/occupancy-db-activity-test.py` — read-only CLI tests for
+  live per-channel activity and DB-side write activity, per SDR
 - `scripts/phase6-occupancy-producer.sh`, `scripts/phase6-hackrf-occupancy-producer.sh` — service installers
 - `systemd/radiod-occupancy.service`, `systemd/radiod-occupancy-hackrf.service` — unit definitions
 - [occupancy-guide.md](occupancy-guide.md) — design rationale, calibration methodology, honest current limitations

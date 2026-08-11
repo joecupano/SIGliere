@@ -36,6 +36,7 @@ SUBDIRS=(
   "reference/sigid/metadata"  # Phase 6.3: SigID mirror page text/revision info
   "reference/sigid/images"    # Phase 6.3: SigID mirror waterfall/example images
   "reference/sigid/audio"     # Phase 6.3: SigID mirror example audio
+  "reference/mac-vendors"     # Phase 6.8: MAC vendor (OUI/CID) database mirror
   "imagery"            # Static images: GIF, PNG, JPG, JPEG, HEIC, etc.
   "signals/raw"        # Raw SDR captures (IQ, unprocessed SigMF pairs)
   "signals/generated"  # SigMF recordings WE generate for external consumption
@@ -63,6 +64,15 @@ if [ -d "${DATA_ROOT}/reference/sigid" ]; then
   echo "Making SigID reference tree container-readable (public reference data)"
   sudo chmod o+x "${DATA_ROOT}" "${DATA_ROOT}/reference"
   sudo chmod -R o+rX "${DATA_ROOT}/reference/sigid"
+fi
+
+# Same reasoning, same fix, for the MAC vendor mirror (Phase 6.8) — also
+# public reference data (a mirror of maclookup.app's OUI/CID registry),
+# also read by the Open WebUI container as a non-owner UID.
+if [ -d "${DATA_ROOT}/reference/mac-vendors" ]; then
+  echo "Making MAC vendor reference tree container-readable (public reference data)"
+  sudo chmod o+x "${DATA_ROOT}" "${DATA_ROOT}/reference"
+  sudo chmod -R o+rX "${DATA_ROOT}/reference/mac-vendors"
 fi
 
 # CRITICAL: /data/models is deliberately NOT owned by the human operator —

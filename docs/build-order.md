@@ -105,6 +105,18 @@ channels into the occupancy DB, grows the sightings table; requires radiod alrea
 ```
 ./scripts/phase6-openapi-tools.sh
 ```
+
+## Phase 6.8 — MAC vendor (OUI/CID) database mirror
+```
+./scripts/phase6-mac-mirror.sh
+./scripts/phase6-mac-mirror-validate.sh
+```
+Sovereign local mirror of maclookup.app's free MAC-address vendor
+database, same pattern as Phase 6.3's SigID mirror — a weekly systemd
+--user timer, not a one-shot dump. Pairs with the Kismet tool (Phase 7):
+identifying who makes a device from its MAC never has to leave the box.
+See `reference/mac_mirror.py` and `openwebui-tools/mac_lookup_tool.py`.
+
 Six core phases, each depending only on what came before it. The AI stack
 (Phases 3–5) is built and proven independently of SIGINT-specific
 software (Phase 6) so the SIGINT layer can lean on already-working

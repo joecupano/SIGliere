@@ -61,6 +61,12 @@ Volume=%h/sovereign-sigint/kismet-data:/data/kismet
 # sigidwiki catalog to; :ro because the tool only reads.
 Volume=/data/reference/sigid:/data/sigid-ref:ro
 
+# MAC vendor (OUI/CID) reference mirror (read-only) -> /data/mac-vendors-ref.
+# The host path is where mac-mirror.service (Phase 6.8) syncs maclookup.app's
+# JSON database to; :ro because the tool only reads. See
+# openwebui-tools/mac_lookup_tool.py.
+Volume=/data/reference/mac-vendors:/data/mac-vendors-ref:ro
+
 # whisper transcription tool -> /data/audio. Bind the host's shared audio
 # staging directory (the same one ai-ingest reads from) so the native
 # whisper tool can transcribe files the operator drops there OR that

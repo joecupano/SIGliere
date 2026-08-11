@@ -168,10 +168,10 @@ avoids hunting.
 
 ## 5. Installing a native tool
 
-*(This is the reusable procedure the occupancy, Kismet, SigID, whisper, and
-operator-control guides all point back to. It captures what broke during
-real setup — follow it in order and tools fire; skip a step and they
-silently won't.)*
+*(This is the reusable procedure the occupancy, Kismet, SigID, MAC vendor,
+whisper, and operator-control guides all point back to. It captures what
+broke during real setup — follow it in order and tools fire; skip a step
+and they silently won't.)*
 
 **Why native, not external OpenAPI/MCP:** a "native tool" is one of this
 repo's Python files in `openwebui-tools/` that runs **in-process inside the
@@ -225,6 +225,12 @@ Volume=%h/sovereign-sigint/kismet-data:/data/kismet
 #   sudo chmod o+x /data /data/reference && chmod -R o+rX /data/reference/sigid
 Volume=/data/reference/sigid:/data/sigid-ref:ro
 
+# MAC vendor reference — :ro, same reasoning as SigID above: a static
+# mirror the mac-mirror timer writes on the HOST side (weekly), the tool
+# only ever reads. Same world-readable caveat applies — see
+# scripts/setup-data-dirs.sh / scripts/phase6-mac-mirror.sh.
+Volume=/data/reference/mac-vendors:/data/mac-vendors-ref:ro
+
 # Whisper transcription — read-write. Shares the same host directory
 # ai-ingest (Phase 5) reads from, so files the operator drops in — or that
 # radiod's pcmrecord writes — are transcribable ad hoc from chat, not just
@@ -261,9 +267,9 @@ first.
 *tools* before real data exists. `scripts/setup-data-dirs.sh` pre-creates an
 empty, schema-valid `occupancy.db`, so the occupancy tool opens cleanly and
 returns "no signals recorded" rather than erroring — that confirms the tool
-*fires*, distinct from confirming it has real data. The SigID and Kismet
-tools will likewise return empty until their sources are synced/captured;
-expected at this stage.
+*fires*, distinct from confirming it has real data. The SigID, MAC vendor,
+and Kismet tools will likewise return empty/error until their sources are
+synced/captured; expected at this stage.
 
 ### Step B — Install the tool file
 
@@ -287,6 +293,7 @@ verify:
 | Occupancy | `DB_PATH` | `/data/sigint/occupancy.db` |
 | Kismet | `KISMETDB_PATH` | `/data/kismet/latest.kismet` |
 | SigID | `SIGID_METADATA_DIR` | `/data/sigid-ref/metadata` |
+| MAC Vendor Lookup | `MAC_VENDOR_DB_PATH` | `/data/mac-vendors-ref/mac-vendors.json` |
 | Whisper | `AUDIO_ROOT` | `/data/audio` |
 | Operator control | `MCP_BASE_URL` | `http://host.containers.internal:8140` (also requires `MCP_OPERATOR_TOKEN` — see §6) |
 
@@ -364,6 +371,12 @@ Install each via §5's procedure. Every file lives in `openwebui-tools/`.
 - **SigID reference** (`sigid_reference_tool.py`) — what a signal *is*, from
   the mirrored sigidwiki catalog. See the vision guide for the
   identification workflow that ties this to a live waterfall.
+- **MAC vendor lookup** (`mac_lookup_tool.py`) — who makes a device, from a
+  MAC address seen in Kismet, using the mirrored maclookup.app OUI/CID
+  database (`reference/mac_mirror.py`, weekly `systemd/mac-mirror.timer`).
+  Sovereign by design: no MAC address or vendor query ever leaves the box.
+  Two functions — `lookup_mac_vendor` (MAC → vendor, longest-prefix match)
+  and `search_mac_vendors` (vendor name → owned prefixes).
 - **Whisper transcription** (`sigint_whisper_tool.py`) — ad-hoc GPU
   transcription/translation of a single audio file at chat time (QSO
   recordings, demodulated voice, broadcast/utility audio), distinct from

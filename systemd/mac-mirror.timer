@@ -1,0 +1,18 @@
+[Unit]
+Description=Run sovereign-sigint MAC vendor database mirror sync weekly
+
+[Timer]
+# Weekly — the upstream database (IEEE OUI/CID assignments mirrored by
+# maclookup.app) changes slowly; new prefixes get registered occasionally,
+# not daily. Same cadence and reasoning as sigid-mirror.timer: a single
+# request pair (landing page + signed download link) once a week is a good
+# citizen, and there's no incremental-sync path here to make more frequent
+# polling cheap the way SigID's recentchanges API does — every run
+# re-downloads the full ~7MB file (mac_mirror.py skips the local WRITE if
+# the content hash is unchanged, but still has to fetch it to check).
+OnBootSec=15min
+OnUnitActiveSec=7d
+Persistent=true
+
+[Install]
+WantedBy=timers.target

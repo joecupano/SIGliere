@@ -19,6 +19,9 @@ every service.
                           (metadata/images/audio subdirs) — external
                           reference data, not something this build
                           generates
+/data/reference/mac-vendors  Phase 6.8: sovereign mirror of maclookup.app's
+                          MAC vendor (OUI/CID) JSON database — external
+                          reference data, pairs with Kismet device MACs
 /data/imagery             Static images — GIF, PNG, JPG, JPEG, HEIC, etc.
 /data/signals/raw         Raw SDR captures (IQ, unprocessed SigMF pairs)
 /data/signals/generated   SigMF recordings WE generate for external consumption
@@ -88,6 +91,14 @@ datasets, distinct from `/data/rag` (manual uploads) and `/data/corpus`
 synced mirror of external curated data with its own update cadence
 (weekly, via `systemd/sigid-mirror.timer`). See `docs/build-order.md`
 Phase 6.3 and `reference/sigid_mirror.py`.
+
+**MAC vendor mirror (`/data/reference/mac-vendors`)**
+Same category as the SigID mirror above — external reference data with its
+own periodic sync (weekly, via `systemd/mac-mirror.timer`), not something
+this build generates. A sovereign local mirror of maclookup.app's MAC
+vendor (OUI/CID) JSON database, so identifying the manufacturer behind a
+MAC address seen by Kismet never requires an outbound lookup at query
+time. See `docs/build-order.md` Phase 6.8 and `reference/mac_mirror.py`.
 
 **SIGINT ingest (`/data/signals/raw`)**
 Capture scripts (`sigint-ingest.py` and friends) and the wideband IQ tap

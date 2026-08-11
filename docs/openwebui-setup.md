@@ -86,6 +86,7 @@ cat ~\sigliere\openwebui-tools\sigid_reference_tool.py
 sigint_kismet_tool.py
 sigint_occupancy_tool.py
 sigint_whisper_tool.py
+mac_lookup_tool.py
 ```
 
 6. Open the tool's Valve settings (gear icon on the tool card) and confirm 
@@ -97,6 +98,7 @@ the shipped defaults already match this build's mounts:
 | Kismet | `KISMETDB_PATH` | `/data/kismet/latest.kismet` |
 | SigID | `SIGID_METADATA_DIR` | `/data/sigid-ref/metadata` |
 | Whisper | `AUDIO_ROOT` | `/data/audio` |
+| MAC Vendor Lookup | `MAC_VENDOR_DB_PATH` | `/data/mac-vendors-ref/mac-vendors.json` |
 
 **Why native, not external OpenAPI/MCP:** a "native tool" is one of this
 repo's Python files in `openwebui-tools/` that runs **in-process inside the
@@ -150,6 +152,10 @@ Every file lives in `openwebui-tools/`.
 - **SigID reference** (`sigid_reference_tool.py`) — what a signal *is*, from
   the mirrored sigidwiki catalog. See the vision guide for the
   identification workflow that ties this to a live waterfall.
+- **MAC vendor lookup** (`mac_lookup_tool.py`) — who makes a device, from a
+  MAC address seen in Kismet, using the mirrored maclookup.app OUI/CID
+  database. Sovereign by design: no MAC address or vendor query ever leaves
+  the box. See `reference/mac_mirror.py`.
 - **Whisper transcription** (`sigint_whisper_tool.py`) — ad-hoc GPU
   transcription/translation of a single audio file at chat time (QSO
   recordings, demodulated voice, broadcast/utility audio), distinct from

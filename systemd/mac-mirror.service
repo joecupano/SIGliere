@@ -1,0 +1,9 @@
+[Unit]
+Description=sovereign-sigint MAC vendor database mirror sync (Phase 6.8)
+
+[Service]
+Type=oneshot
+# __REPO_ROOT__ and __VENV_PYTHON__ substituted by
+# scripts/phase6-mac-mirror.sh at install time.
+WorkingDirectory=__REPO_ROOT__/reference
+ExecStart=__VENV_PYTHON__ __REPO_ROOT__/reference/mac_mirror.py --once

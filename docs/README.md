@@ -67,7 +67,7 @@
 
 - **[openwebui-setup-guide.md](openwebui-setup-guide.md)** — START
   HERE for the AI front end. First-run setup, connecting Ollama, pulling
-  the three models, and the canonical step-by-step procedure for
+  the four models, and the canonical step-by-step procedure for
   installing/enabling a native tool (the one the occupancy, Kismet, and
   SigID docs link to). Captures the setup gotchas learned building this.
 

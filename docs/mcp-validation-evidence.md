@@ -1550,3 +1550,190 @@ Operator confirmed the Open WebUI connection now saves/verifies
 successfully. Role gating regression-tested clean — the fix only unblocks
 the browser preflight, it changes nothing about who can call
 `set_frequency`.
+
+## 2026-08-11 hackrf-2m: Gain Config Bug Found and Fixed (dead key + boolean mistaken for a dB value)
+
+- Scope: field-verification pass on six open HackRF/RTL-SDR-under-radiod
+  checklist items (driver support, gain params, threshold calibration,
+  70cm activation, rtlsdrd dependency, RTL-SDR control syntax). Most were
+  either already-confirmed-working or already-closed by earlier entries
+  in this log; two turned into new, real findings, documented here.
+
+### HackRF driver support: confirmed working (re-verified, not new)
+
+`/usr/local/lib/ka9q-radio/hackrf.so` loads live; `journalctl -u
+radiod@hackrf-2m` shows `Found 1 HackRF device(s):
+0000000000000000a06063c82b6f0f1b`, 5 demodulators started. Independently
+cross-checked with the stock `hackrf_info` tool (unrelated to
+ka9q-radio): same serial number, `Resource busy` — confirms real USB
+hardware, currently exclusively held by the running radiod instance.
+
+### Gain config: two real bugs found by tracing `hackrf.c`
+
+Source: `/opt/sovereign-sigint/src/ka9q-radio/src/hackrf.c` on this
+host (the build `radiod`/`hackrf.so` were compiled from).
+
+1. **`mix-gain = 24` in `radiod@hackrf-2m.conf` did nothing.** The
+   recognized key is `mixer-gain`; `config_getint()` does an exact
+   string lookup (`config.c`, no fuzzy matching), so this always
+   returned the "not found" default and fell through to hackrf.c's own
+   hardcoded fallback (also `24`, coincidentally). Confirmed live:
+   `journalctl` showed `[hackrf] key "mix-gain": did you mean
+   "mixer-gain"?` immediately followed by `set mixer gain 24` — right
+   number, wrong reason. `config_validate_section()`'s warning is
+   advisory-only (return value never checked by `hackrf_setup()`), so
+   this never blocked startup and went unnoticed.
+2. **`lna-gain = 40` was never a 0-40dB gain.** `hackrf.c`'s own
+   comment: *"what we call mixer gain, they call lna gain / what we
+   call lna gain, they call antenna enable."* This key feeds directly
+   into `hackrf_set_antenna_enable()` — a boolean. Any nonzero value
+   behaves identically to `1`; the conf's "LNA 40 / VGA 48, calibrated"
+   header comment was simply wrong about what this build's `lna-gain`
+   controls.
+3. Related, not itself a bug in this repo: `HackRF_keys[]`'s advisory
+   "recognized" list includes `vga-gain`, but the code never reads that
+   key anywhere — it reads `if-gain` for the VGA stage instead (used in
+   `radiod@hackrf-70cm.conf`, absent from `hackrf-2m.conf`). `if-gain`
+   works despite not being "recognized" (same advisory-only validation
+   as above); `vga-gain` is a dead name in this ka9q-radio build.
+
+**Real gain mapping on this build, source-confirmed:**
+`lna-gain` -> `hackrf_set_antenna_enable()` (boolean) · `mixer-gain` ->
+`hackrf_set_lna_gain()` (HackRF's real onboard LNA, 0-40dB/8dB steps) ·
+`if-gain` -> `hackrf_set_vga_gain()` (HackRF's real VGA, 0-62dB).
+
+### Threshold calibration: still a placeholder, now explainable
+
+A live `--verbose` sweep (`scripts/ka9q-channel-activity-test.py --sdr
+hackrf-2m`, 3 rounds) read a **uniform -4.3 to -4.8 dBFS across all 5
+channels simultaneously** — not plausible for 5 unrelated 2m
+frequencies (APRS, calling freq, ISS downlink, two others) from real
+independent activity. This is consistent with finding #2: `lna-gain`
+being treated as a boolean disables `frontend->rf_agc`
+(`journalctl` confirms `agc off`), so the front end ran at a fixed,
+undifferentiated gain — plausible cause of broadband overload rather
+than real per-channel signal. **Conclusion: do not calibrate
+`DEVICE_PROFILES["hackrf"]`'s threshold yet** — a sweep right now would
+calibrate against the overload, not real activity.
+
+### Fix applied
+
+`ingest/ka9q-radio/radiod@hackrf-2m.conf`:
+- `mix-gain = 24` -> `mixer-gain = 24` (same value already in de facto
+  effect via the broken key's fallback default — deliberately NOT
+  jumped to a new untested number, since the overload question above is
+  still open; raising gain further first would likely make it worse).
+- `lna-gain = 40` -> `lna-gain = 1` (behavior-identical — both nonzero
+  — purely removes the misleading appearance of a chosen dB value).
+- Header comments rewritten to state the real key->hardware-call mapping
+  above instead of the incorrect "LNA 40 / VGA 48 calibrated" framing.
+- Deployed to `/etc/radio/radiod@hackrf-2m.conf` (writable without root
+  — `/etc/radio` is `radio`-group-writable, this session's user is in
+  that group; the file itself is `644 root:radio` so a direct `cp`
+  failed permission-denied, `rm` + recreate through the group-writable
+  directory succeeded). Confirmed byte-identical to the repo copy.
+
+### Blocked on: service restart needs root
+
+`sudo systemctl restart radiod@hackrf-2m` requires an interactive
+password — no passwordless sudo for this session, consistent with every
+earlier entry in this log. The deployed `/etc/radio/` file has the fix;
+the **running** `radiod@hackrf-2m` process has not picked it up yet.
+Operator needs to run:
+```
+sudo systemctl restart radiod@hackrf-2m
+```
+then confirm via `journalctl -u radiod@hackrf-2m -n 20 --no-pager` that
+the `did you mean "mixer-gain"?` line is gone and `set mixer gain 24`
+still appears (same value, now genuinely sourced from the file). Do not
+attempt threshold calibration until *after* this restart AND a fresh
+sweep shows differentiated per-channel dBFS (not another uniform
+reading) — if it's still uniform post-restart, the overload has another
+cause and gain isn't the explanation.
+
+### 70cm/HackRF activation: confirmed exactly as the checklist states
+
+`radiod@hackrf-70cm.conf` exists only in the repo, never deployed to
+`/etc/radio/` (only `hackrf-2m.conf` and `rx888-hf.conf` are there).
+`radiod@hackrf-70cm.service` resolves (generic `radiod@.service`
+template matches any instance name) but is disabled and would fail
+immediately on start (`ExecStart` references a conf file that doesn't
+exist at `/etc/radio/`). `scripts/sdr-mode.sh` hardcodes
+`HACKRF_RADIOD_INSTANCE="radiod@hackrf-2m"` — no 70cm awareness
+anywhere in that script. Open decision, not touched this pass.
+
+### RTL-SDR `rtlsdrd` dependency: already closed (re-confirmed, not new)
+
+Re-confirmed no `rtlsdrd` binary and no such package exist on this host.
+This was already closed by the 2026-08-05 entry above (`radiod` loads
+RTL-SDR directly via `rtlsdr.so`, same plugin pattern as the other two
+front ends, no companion daemon) — the open-items checklist that
+prompted this pass was stale on this specific item.
+
+### RTL-SDR control tasking syntax: superseded by the descope, not re-run
+
+Not re-investigated this pass — the prior investigation (2026-08-06
+entries above) already concluded the native `control` TUI isn't
+meaningfully scriptable (interactive, one `sendto()` per keystroke,
+confirmed at `control.c:925`) and the working scriptable path
+(`ka9q-python`'s `control.tune()`) hit the real upstream command-queue
+bug on a second retask
+([ka9q/ka9q-radio#239](https://github.com/ka9q/ka9q-radio/issues/239)),
+which is why RTL-SDR was permanently descoped to OpenWebRX+-only. Also
+re-confirmed this pass: `radiod@rtlsdr-v4` still inactive/disabled, and
+`/etc/radio/radiod@rtlsdr-v4.conf` still byte-identical to the repo's
+`radiod@rtlsdr-adhoc.conf`. No remaining field check here unless the
+descope is revisited after upstream movement on #239.
+
+## 2026-08-11 hackrf-2m: Restart Confirmed Applied — Correction to the Overload Theory Above
+
+Operator ran `sudo systemctl restart radiod@hackrf-2m`. Confirmed live via
+`journalctl`: the `did you mean "mixer-gain"?` warning is gone, and
+startup now logs `lna gain 1 mix gain 24 if gain 20 agc off` — the fix
+applied cleanly.
+
+**Correction to this same day's entry above.** That entry's gain-fix
+section speculated the uniform -4.3..-4.8 dBFS reading was "consistent
+with front-end overload" caused by the gain-key bugs, and suggested
+recalibration should wait until "the overload question is resolved" by
+this fix. That framing was too confident. Checked post-restart: the
+continuous producer (`radiod-occupancy-hackrf.service`, independent of
+any ad-hoc test script) is still writing fresh sightings, 5/5 channels
+active, reading **-4.6 to -4.9 dBFS — same uniform level as before the
+restart.** This is expected once cross-checked against what actually
+changed: `mixer-gain` (24) and `if-gain` (default 20) are byte-for-byte
+identical before and after the fix — deliberately, per that entry's own
+reasoning about not jumping to an untested gain number. `agc off` was
+also already true both before and after (any non-`-1` `lna-gain`
+disables `rf_agc` regardless of its numeric value, so `40`->`1` doesn't
+change that either). **The fix was correctly behavior-preserving, which
+also means it was never going to change this reading — the "gain bug
+caused the overload" theory doesn't hold up against this evidence.**
+
+Separately: `scripts/ka9q-channel-activity-test.py --sdr hackrf-2m -v`,
+run once by the operator right after the restart, read NO DATA on all 5
+channels — while the continuous producer, reading the same multicast
+streams at essentially the same moment, got real data. Both processes
+join the same multicast groups to read the same RTP streams; one
+starving the other's 2-second capture window is the likely explanation,
+not a regression from the config change. Reproduced earlier this same
+session independently (3 back-to-back runs of the same script: 1st got
+data, 2nd/3rd got NO DATA, producer untouched throughout) — a real,
+pre-existing gap in that script (no retry/backoff against a stream a
+continuous consumer is also draining), not investigated further this
+pass.
+
+**Still open, unresolved:** why every 2m channel reads the same uniform
+~-4.7 dBFS regardless of which of 5 different frequencies (APRS,
+calling, ISS downlink, two others) is being measured. Gain values are
+now confirmed NOT the explanation (see above). Untested candidates:
+genuine local broadband RF (should be checked by disconnecting the
+antenna and confirming the reading drops materially); a receiver/driver
+measurement artifact independent of true signal level (should be
+checked by deliberately setting `if-gain`/`mixer-gain` far lower and
+confirming the reported dBFS actually moves — if it doesn't move
+proportionally, the measurement path itself, not the RF environment, is
+suspect). Neither tried yet — both need another `sudo systemctl
+restart radiod@hackrf-2m` cycle, not run without asking first.
+`DEVICE_PROFILES["hackrf"]`'s threshold remains uncalibrated; do not
+calibrate against this reading until one of the above is ruled out.

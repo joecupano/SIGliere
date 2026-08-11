@@ -77,8 +77,7 @@ cat ~\sigliere\openwebui-tools\sigid_reference_tool.py
 
 2. In the UI: **Workspace → Tools → "+"** (Create New Tool).
 
-3. Paste the **entire file**. Name/description auto-fill from the file's
-   header docstring.
+3. Remove existing content and paste the **entire file**. Name/description auto-fill from the file's header docstring.
    
 4. **Save**.
 

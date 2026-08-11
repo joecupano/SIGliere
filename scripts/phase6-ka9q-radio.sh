@@ -192,7 +192,7 @@ sudo systemctl enable --now "radiod@${INSTANCE_NAME}"
 sleep 3
 echo
 echo "-- radiod status --"
-sudo systemctl status "radiod@${INSTANCE_NAME}" --no-pager -l | head -20
+sudo systemctl status "radiod@${INSTANCE_NAME}" --no-pager -l | head -20 || true
 
 # ---------------------------------------------------------------------
 # FFTW wisdom — baseline generation was kicked off in the background

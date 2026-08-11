@@ -21,7 +21,11 @@ echo
 # Models physically on /data/models
 # ---------------------------------------------------------------------
 echo "-- Model storage location --"
-if [[ -d /data/models ]] && [[ -n "$(ls -A /data/models 2>/dev/null)" ]]; then
+# sudo on the existence/emptiness check too, not just the du below —
+# /data/models is deliberately 0770 ollama:ollama (least-privilege: the
+# service account owns its model store), so an unprivileged `ls -A`
+# here would report FAIL even when everything is set up correctly.
+if [[ -d /data/models ]] && [[ -n "$(sudo ls -A /data/models 2>/dev/null)" ]]; then
   SIZE=$(sudo du -sh /data/models 2>/dev/null | cut -f1)
   echo "  PASS: /data/models populated (${SIZE})"
   RESULTS+=("Model storage: PASS (${SIZE} on /data/models)")

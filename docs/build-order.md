@@ -120,3 +120,6 @@ base OS/toolchain from Phases 1–2.
 ./scripts/phase7-kismet-refresh.sh
 ./scripts/phase7-kismet-validate.sh
 ```
+
+# Phase 8 - Open Web UI Setup
+Proceed to the [OpenWeb](openwebui-setup.md) UI Setup document.

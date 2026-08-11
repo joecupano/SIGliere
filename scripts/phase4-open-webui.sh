@@ -34,14 +34,39 @@ mkdir -p "${QUADLET_DIR}"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
 mkdir -p "${SYSTEMD_USER_DIR}"
 mkdir -p "${HOME}/.config/systemd/user/open-webui.service.d"
-mkdir -p "${HOME}/sovereign-sigint/db"
 
-# Seed the shared occupancy DB directory from the repo copy if it exists.
-# The native tool reads the DB from inside the container, so the mounted host
-# directory must contain the current DB before Open WebUI starts.
-if [[ -f "${REPO_ROOT}/db/occupancy.db" ]]; then
-  cp "${REPO_ROOT}/db/occupancy.db" "${HOME}/sovereign-sigint/db/occupancy.db"
-fi
+# The Quadlet mounts a HOME-relative, REPO_ROOT-independent path
+# (~/sovereign-sigint/{db,kismet-data}) into the container, so the
+# container-side tool config never has to know where the repo happens to
+# be cloned. Point those paths at the repo's LIVE data via symlinks, not
+# a one-time copy — a real bug, found and fixed 2026-08-11: this used to
+# `cp db/occupancy.db` once here and never again, which silently froze
+# the occupancy native tool's view from that instant forward while the
+# real radiod-occupancy producer kept growing db/occupancy.db underneath
+# it (confirmed live: the two diverged by 1000+ rows within the same
+# session). kismet-data had no seeding at all, so a truly fresh install
+# hit the "don't exist yet" hard-fail below every time — nothing in this
+# repo has ever written to ~/sovereign-sigint/kismet-data;
+# scripts/kismet-refresh.sh always writes to ${REPO_ROOT}/kismet-data.
+mkdir -p "${REPO_ROOT}/db" "${REPO_ROOT}/kismet-data"
+for name in db kismet-data; do
+  link="${HOME}/sovereign-sigint/${name}"
+  target="${REPO_ROOT}/${name}"
+  mkdir -p "$(dirname "${link}")"
+  if [[ -L "${link}" ]]; then
+    # Already a symlink — repoint only if it's wrong; don't touch a
+    # correct one just to avoid spurious churn on repeat runs.
+    [[ "$(readlink -f "${link}")" == "$(readlink -f "${target}")" ]] || \
+      ln -sfn "${target}" "${link}"
+  elif [[ -e "${link}" ]]; then
+    echo "NOTE: ${link} exists as a real directory, not a symlink — leaving" >&2
+    echo "it alone (may be pre-existing data worth checking by hand). If" >&2
+    echo "it's just a stale derivative copy, replace it with:" >&2
+    echo "  rm -rf ${link} && ln -s ${target} ${link}" >&2
+  else
+    ln -s "${target}" "${link}"
+  fi
+done
 
 # Install the Kismet staging unit if it isn't present yet (phase 7 normally
 # owns this, but phase 4 now seeds it so the startup path is robust even if

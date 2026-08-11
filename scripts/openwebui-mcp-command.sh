@@ -5,9 +5,19 @@ set -euo pipefail
 # This uses streamable HTTP and a role-scoped bearer token, looked up from
 # mcp.env's SIGLIERE_MCP_TOKENS_JSON (the single source of truth for
 # token-to-role mapping — nothing here hardcodes or duplicates a token).
-# NOTE: only use this when Open WebUI connection Type is MCP.
-# If your Open WebUI only supports OpenAPI tools, use
-# scripts/openwebui-openapi-command.sh instead.
+# NOTE: only use this when Open WebUI connection Type is MCP. Confirmed on
+# this repo's actual Open WebUI 0.11.0: that connection type does NOT
+# exist in this build's Admin Panel (OpenAPI is the only option) — this
+# script is kept for a future Open WebUI upgrade that adds it, per
+# docs/openapi-to-mcp-migration.md, not usable as of 2026-08-08.
+# CORRECTED 2026-08-11 — this used to point at
+# scripts/openwebui-openapi-command.sh, which is for a different,
+# unrelated server (the older openapi-tools/ SIGINT server on :8130).
+# The actual companion for THIS MCP server (:8140), registered as an
+# OpenAPI-type connection instead of MCP-type, is:
+#   scripts/openwebui-mcp-openapi-command.sh
+# — that one is the currently-working path; see
+# mcp-server/openwebui-role-prompts.md Step 0.
 #
 # Usage: ./scripts/openwebui-mcp-command.sh [analyst|operator]
 #   No argument: prints both blocks (analyst first, then operator) — you

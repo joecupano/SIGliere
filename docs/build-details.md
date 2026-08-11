@@ -388,7 +388,14 @@ Scripts:
 `scripts/phase6-ka9q-radio-validate.sh` (real capture via `pcmrecord`,
 not just service-active status).
 ```
-Built from source per ka9q-radio's own docs — no apt package exists.
+Built from source per ka9q-radio's own docs — no apt-installable
+repo/PPA exists. (Clarified 2026-08-11: ka9q-radio DOES ship its own
+real `debian/` Debian packaging upstream — `packages/` in this repo has
+pre-built `.deb`s from it, see `packages/README.md` — but that's a
+locally-built artifact, not something `apt-get install` can pull from a
+repo. `scripts/phase6-ka9q-radio.sh`'s from-source build is still what
+this repo's install process and this host's live `radiod` instances
+actually use.)
 `radiod` drives the RX-888 MkII directly via libusb (its own code path,
  separate from `rx888_stream`), so this is where the hardware validated
 earlier gets its first real workload, not where it gets tested for

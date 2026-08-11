@@ -474,6 +474,10 @@ retired MCP attempt — is in
 - `scripts/ka9q-channel-activity-test.py`,
   `scripts/occupancy-db-activity-test.py` — read-only CLI tests for
   live per-channel activity and DB-side write activity, per SDR
+- `scripts/occupancy-db-manage.py` — the write counterpart: reset the DB
+  to empty, or delete sightings by date range/SDR/frequency. Dry-run by
+  default, auto-backs up before any real change; needs `--yes` to
+  actually touch anything
 - `scripts/phase6-occupancy-producer.sh`, `scripts/phase6-hackrf-occupancy-producer.sh` — service installers
 - `systemd/radiod-occupancy.service`, `systemd/radiod-occupancy-hackrf.service` — unit definitions
 - [occupancy-guide.md](occupancy-guide.md) — design rationale, calibration methodology, honest current limitations

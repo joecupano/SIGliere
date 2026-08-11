@@ -70,7 +70,12 @@ location-specific** — the guides teach how to re-derive them for your site.
   fixed at the client/MCP level, but tracing revealed a `ka9q-radio`
   bug that limits a live-tasked channel to one control command per
   `radiod` restart, unfixable from this repo. Filed upstream:
-  [docs/ka9q-radio-upstream-issue-command-queue.md](docs/ka9q-radio-upstream-issue-command-queue.md).
+  [ka9q/ka9q-radio#239](https://github.com/ka9q/ka9q-radio/issues/239)
+  (drafted as `docs/ka9q-radio-upstream-issue-command-queue.md`, removed
+  from the repo 2026-08-08 once actually filed — the GitHub issue is the
+  living copy now, closed 2026-08-10 pending an unmerged upstream fix,
+  not yet independently re-verified — see `docs/mcp-validation-evidence.md`'s
+  2026-08-11 entries).
   Full evidence: [docs/mcp-validation-evidence.md](docs/mcp-validation-evidence.md).
   The `mcp-server` code and `radiod` conf built for this are kept
   in-repo (not deleted) in case `ka9q-radio` gets patched.
@@ -133,7 +138,14 @@ location-specific** — the guides teach how to re-derive them for your site.
   [docs/mcp-validation-evidence.md](docs/mcp-validation-evidence.md). Runs as
   the `sigliere-mcp` Podman Quadlet service; Open WebUI still connects via
   OpenAPI until MCP tool support is stable in your deployed version — see
-  [docs/openapi-to-mcp-migration.md](docs/openapi-to-mcp-migration.md).
+  [docs/openapi-to-mcp-migration.md](docs/openapi-to-mcp-migration.md). Live
+  in production (not dry-run) on this host as of 2026-08-11. Read-only
+  access is a registered OpenAPI connection; tuning access is deliberately
+  **not** a connection at all — it's `openwebui-tools/sigint_operator_tool.py`,
+  a native tool that checks the calling user's Open WebUI group membership in
+  code, after confirming this Open WebUI build has no working way to scope a
+  shared connection to a group — see
+  `mcp-server/openwebui-role-prompts.md`'s History section.
 - **Services** — rootless Podman Quadlet units + systemd `--user` timers;
   Caddy fronts Open WebUI for LAN/TLS access.
 
@@ -160,6 +172,9 @@ openapi-tools/      OpenAPI tool server for Open WebUI external-tool integration
 mcp-server/         MCP control-plane server (SDR state/tuning via radiod)
 protocol-security/  Kismet and related protocol/WiFi tooling
 ai-ingest/          document/image/audio ingest for the RAG knowledge feature
+packages/           pre-built ka9q-radio Debian packages (see packages/README.md
+                     for exact commit/build flags -- not what this host's live
+                     radiod instances actually run, see that file)
 ```
 
 ## Not yet built / deferred

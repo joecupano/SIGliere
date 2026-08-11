@@ -20,10 +20,15 @@ The design is intended for the current build topology:
 - ~~RTL-SDR via ad hoc or scripted tasking~~ — **tried and descoped**
   (2026-08-06): the client/MCP side was built and fixed, but a
   `ka9q-radio` bug limits a live-tasked channel to one control command
-  per `radiod` restart — see
-  [ka9q-radio-upstream-issue-command-queue.md](ka9q-radio-upstream-issue-command-queue.md)
-  and [mcp-validation-evidence.md](mcp-validation-evidence.md). RTL-SDR
-  is OpenWebRX+-only until/unless that's patched upstream.
+  per `radiod` restart — filed as
+  [ka9q/ka9q-radio#239](https://github.com/ka9q/ka9q-radio/issues/239)
+  (drafted locally as `ka9q-radio-upstream-issue-command-queue.md`,
+  removed once filed — that file no longer exists in this repo, the
+  GitHub issue is the living copy) — see
+  [mcp-validation-evidence.md](mcp-validation-evidence.md). Issue closed
+  2026-08-10 pending an unmerged upstream fix, not yet independently
+  re-verified (2026-08-11 entries). RTL-SDR is OpenWebRX+-only
+  until/unless that's confirmed fixed.
 
 ## Goals
 

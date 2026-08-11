@@ -1397,7 +1397,10 @@ a materially different, more limited status than "PASS" alongside
   (operator-run), freeing the RTL-SDR for OpenWebRX+'s single-owner
   use per `scripts/sdr-mode.sh`'s rule.
 - Upstream bug report drafted:
-  [ka9q-radio-upstream-issue-command-queue.md](ka9q-radio-upstream-issue-command-queue.md)
+  `ka9q-radio-upstream-issue-command-queue.md` (this file was later
+  removed from the repo 2026-08-08 once actually filed — see below and
+  the 2026-08-11 entries; it no longer exists here, the filed GitHub
+  issue is the living copy: [ka9q/ka9q-radio#239](https://github.com/ka9q/ka9q-radio/issues/239))
   — not yet filed as of this entry (no `gh` CLI available on this
   host; needs the operator to submit via the GitHub web UI).
 - `README.md`, `docs/MCP-server-design.md`, `scripts/sdr-mode.sh`
@@ -1932,10 +1935,11 @@ left at upstream defaults.
 While checking recent upstream activity, found that
 [ka9q/ka9q-radio#239](https://github.com/ka9q/ka9q-radio/issues/239) —
 this project's own filed report, the exact command-queue bug behind the
-RTL-SDR AI/MCP descope (see the 2026-08-06 entries above and
-`docs/ka9q-radio-upstream-issue-command-queue.md`) — was closed
-2026-08-10. Read the actual comment thread rather than trusting the
-"closed" status alone:
+RTL-SDR AI/MCP descope (see the 2026-08-06 entries above — drafted
+locally at the time as `docs/ka9q-radio-upstream-issue-command-queue.md`,
+removed from the repo once filed, this GitHub issue is the only living
+copy now) — was closed 2026-08-10. Read the actual comment thread rather
+than trusting the "closed" status alone:
 
 - Karn identified the reporter was building from `e1224dcd` ("a really
   old commit, from last November") and said the real fix lives in his

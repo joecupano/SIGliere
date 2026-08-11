@@ -62,14 +62,29 @@ systemctl --user enable --now sigliere-mcp.service
 
 ## Open WebUI integration
 
-Generate manual tool settings (prints both the analyst and operator
-connection blocks; pass `analyst` or `operator` to print just one):
+**As of 2026-08-11: only the analyst connection is registered in Open
+WebUI.** The operator (tuning) capability is a native in-process tool
+instead — `openwebui-tools/sigint_operator_tool.py` — not a registered
+connection at all. See `openwebui-role-prompts.md` for why and the full
+setup sequence; don't register an operator OpenAPI connection without
+reading that first.
+
+Generate the analyst connection block. This repo's actual Open WebUI
+0.11.0 build only offers connection **Type = OpenAPI** (no MCP/Streamable
+HTTP option in its Admin Panel), so use the OpenAPI-flavored script, not
+the plain MCP one below:
 
 ```bash
-bash scripts/openwebui-mcp-command.sh
+bash scripts/openwebui-mcp-openapi-command.sh analyst
 ```
 
-Use the printed URL and Authorization header in Open WebUI MCP tool settings.
+Paste the printed block into **Admin Panel → Settings → Tools → Tool
+Servers**.
+
+(`scripts/openwebui-mcp-command.sh` prints `Type: MCP / Streamable HTTP`
+blocks instead — kept in case a future Open WebUI upgrade adds native MCP
+connection support per `docs/openapi-to-mcp-migration.md`, but not usable
+on this build as of 2026-08-11.)
 
 Automated container validation:
 
@@ -94,13 +109,22 @@ python src/operator_cli.py tune hackrf-vhf-uhf 144390000 nfm
 ## Role provisioning prompts for Open WebUI
 
 See `openwebui-role-prompts.md` for the full step-by-step sequence
-(register both connections → create both groups → scope access → assign
-users), current status, and the live confirmation that the MCP server
-enforces the analyst/operator boundary server-side regardless of how
-Open WebUI is configured.
+(register the analyst connection → create both groups → install
+`sigint_operator_tool.py` for operator access → assign users), current
+status, and the live confirmation that the MCP server enforces the
+analyst/operator boundary server-side regardless of how Open WebUI is
+configured. **Not** "scope both connections to their groups" — that was
+the original plan, confirmed not to work in this Open WebUI build; see
+that file's History section before assuming otherwise.
 
 ## Notes
 
 - Start with `SIGLIERE_MCP_DRY_RUN=true` for validation.
 - Flip to `false` only after ka9q-python method compatibility is verified on your host.
 - If Open WebUI native MCP remains incompatible in your version, you can keep using the existing OpenAPI server path in `openapi-tools/` while this MCP service is validated.
+- On this project's own host: `SIGLIERE_MCP_DRY_RUN` is `false` (production)
+  as of 2026-08-11, both nodes (`rx888-hf`, `hackrf-vhf-uhf`) already
+  passed live `set_frequency` tests — see
+  `docs/mcp-validation-evidence.md`. That's this host's own state, not a
+  new default for `.env.example`/`mcp.env.example`, which deliberately
+  stay `true` for a fresh deployment that hasn't proven its own nodes yet.

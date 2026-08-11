@@ -51,14 +51,32 @@ sudo chown "${TARGET_USER}:${TARGET_USER}" "${SRC_ROOT}"
 # Pin to a known-working commit rather than tracking bare main.
 # ka9q-radio's main branch moves fast and periodically breaks external
 # builds — the projecthorus/auto_rx project pins for exactly this reason.
-# Real breakage this pinning prevents: a later main tree pulled fobos.c
-# into the DEFAULT build path (it should only compile with `make FOBOS=1`,
-# per ka9q's own notes.md, since it needs third-party libfobos headers we
-# don't install and no Fobos device is present) — causing a hard
-# `fatal error: fobos.h: No such file or directory` build failure.
 # Override with KA9Q_COMMIT=<sha> (or KA9Q_COMMIT=main to track tip) if
 # you deliberately want a different revision.
-KA9Q_COMMIT="${KA9Q_COMMIT:-e1224dcd1991637ba8e1caa68cd802e1b22933de}"
+#
+# RE-PINNED 2026-08-11 (was e1224dcd1991637ba8e1caa68cd802e1b22933de,
+# 2025-11-08 -- 9 months stale at the time of this update; see
+# docs/mcp-validation-evidence.md for the full check). Verified against
+# GitHub's live API before re-pinning, not assumed:
+#   - Confirmed via `git log -1` on this host's actual installed source
+#     that the old pin really was what got built, not just what this
+#     script claimed.
+#   - The ORIGINAL reason this script pins at all (a bare `make` on main
+#     trying to compile fobos.c against headers we don't have) is still
+#     real on current main -- upstream's build system changed shape
+#     since the old pin (see the ENABLE_* note below) but the underlying
+#     risk didn't go away.
+#   - Checked ka9q/ka9q-radio#239 (this project's own filed bug, the
+#     reason RTL-SDR is currently OpenWebRX+-only, see
+#     docs/mcp-validation-evidence.md and README.md): closed 2026-08-10,
+#     but NOT because the fix is confirmed merged/working -- Karn pointed
+#     at his separate, not-yet-merged `setup-restructure` branch, and the
+#     issue was closed pending someone actually testing that branch, which
+#     had not happened as of this pin update. Re-pinning to main does
+#     NOT include that fix. Don't assume the RTL-SDR descope can be
+#     revisited just because this pin moved forward -- that needs its own
+#     deliberate test against `setup-restructure` specifically.
+KA9Q_COMMIT="${KA9Q_COMMIT:-1c0a4231d20f4257569715325242d6f2432dd939}"  # main HEAD as of 2026-08-10
 
 if [[ ! -d "${SRC_ROOT}/ka9q-radio" ]]; then
   git clone --quiet https://github.com/ka9q/ka9q-radio.git "${SRC_ROOT}/ka9q-radio"
@@ -73,18 +91,38 @@ else
   echo "  Pinned to ka9q-radio ${KA9Q_COMMIT}"
 fi
 
-# Explicitly do NOT pass FOBOS=1 / SDRPLAY=1 — those drivers need
-# third-party headers not installed here, and no such device is present.
-# The rx888 driver we need is statically built into radiod by default.
+# Per-driver ENABLE_* build flags (top-level Makefile, confirmed live
+# via GitHub 2026-08-11 -- this is a NEWER build system than the old
+# Nov 2025 pin had; the old "don't pass FOBOS=1" comment described the
+# OPPOSITE convention (opt-in flags) and no longer applies). Current
+# upstream Makefile defaults nearly everything to 1 (on), including
+# ENABLE_FOBOS and ENABLE_HYDRASDR -- both need third-party vendor
+# headers (libfobos, libhydrasdr) that are NOT apt-installable and NOT
+# installed on this host (confirmed: no such packages found via
+# apt-cache, no headers found anywhere on disk), so leaving either at
+# its default 1 reproduces the exact `fatal error: ...h: No such file
+# or directory` build failure this script has always pinned to avoid.
+# Neither device is present on this build anyway. Every other ENABLE_*
+# flag's dev headers ARE already installed above (airspy/airspyhf/
+# bladerf/hackrf/rtlsdr) or need no vendor SDK (rx888, funcube,
+# sig_gen), so they're left at their upstream defaults.
 make clean >/dev/null 2>&1 || true   # clear any stale/partial prior build
-make -j"$(nproc)"
+make ENABLE_FOBOS=0 ENABLE_HYDRASDR=0 -j"$(nproc)"
 
 # `make install` creates the 'radio' system user/group, installs
 # /usr/local/sbin/radiod, and the systemd template unit
 # /etc/systemd/system/radiod@.service. Per ka9q-radio's own docs, add
 # your own user to the 'radio' group afterward so you can inspect/edit
 # the installed files without becoming root each time.
-sudo make install
+#
+# ENABLE_FOBOS=0 ENABLE_HYDRASDR=0 MUST be repeated here -- confirmed via
+# a real failure 2026-08-11: `make install` is a SEPARATE invocation from
+# the build above and does not inherit its command-line variables. Without
+# repeating them, `install`'s own dependency chain rebuilds fobos.o fresh
+# with ENABLE_FOBOS back at its unset `?= 1` default, hitting the exact
+# `fatal error: fobos.h: No such file or directory` this script pins to
+# avoid -- the line above alone does not prevent it.
+sudo make ENABLE_FOBOS=0 ENABLE_HYDRASDR=0 install
 
 echo "-- Adding ${TARGET_USER} to the 'radio' group --"
 sudo usermod -aG radio "${TARGET_USER}"

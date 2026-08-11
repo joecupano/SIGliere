@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import socket
-import subprocess
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,6 +8,13 @@ try:
     import ka9q  # type: ignore
 except Exception:  # pragma: no cover
     ka9q = None
+
+# How long service_state() listens via ka9q.discover_channels_native()
+# before concluding a node's radiod is unreachable. Confirmed live
+# 2026-08-11: even 1.0s reliably found every channel on both this
+# repo's nodes (5 on hackrf-2m, ~16 on rx888-hf); 1.5s adds a small
+# margin without making the /radiod_status endpoint feel sluggish.
+STATUS_DISCOVERY_SEC = 1.5
 
 
 @dataclass(frozen=True)
@@ -50,30 +55,51 @@ class RadiodAdapter:
         self.dry_run = dry_run
 
     def service_state(self, node: RadiodNode) -> dict[str, Any]:
-        try:
-            proc = subprocess.run(
-                ["systemctl", "is-active", f"radiod@{node.radiod_instance}"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-            active = (proc.stdout or "unknown").strip() or "unknown"
-        except Exception as exc:  # pragma: no cover
-            active = f"error:{exc.__class__.__name__}"
+        """Report whether radiod for this node looks alive.
 
-        socket_open = False
-        try:
-            with socket.create_connection((node.host, node.port), timeout=0.5):
-                socket_open = True
-        except OSError:
-            socket_open = False
+        FIXED 2026-08-11 (see docs/mcp-validation-evidence.md): this used
+        to shell out to `systemctl is-active radiod@<instance>`, which can
+        never work -- sigliere-mcp runs inside a container with no
+        systemd/systemctl at all (confirmed live: `which systemctl` finds
+        nothing in that container), so this always returned
+        "error:FileNotFoundError" regardless of the node's actual health.
+        It also used to probe a plain TCP connection to node.host/node.port
+        (127.0.0.1:5000/5001 in nodes.json), but nothing in this stack
+        ever listens on those -- radiod exposes no TCP control port at all.
+
+        Replaced with a real, container-safe signal:
+        `ka9q.discover_channels_native()` against node.status_address --
+        the same SDK call `_resolve_status_address()` below already
+        trusted for discovery, now reused for liveness too. Confirmed
+        live this session that a hand-rolled raw-socket multicast join
+        (the first attempt at this fix) reliably received NOTHING, even
+        with a 15s window and even using ka9q-python's own StatusListener
+        -- this host's radiod publishes status with TTL=0 (loopback-only,
+        confirmed via discover_channels_native's own "Multicast data
+        restricted to localhost loopback only!" warning), which the SDK
+        call handles correctly and raw sockets did not, for reasons not
+        pinned down further. Rather than debug the raw-socket path
+        deeper, this uses the already-correct, already-proven SDK
+        function instead of re-solving a problem it already solves.
+        """
+        if ka9q is None or not hasattr(ka9q, "discover_channels_native"):
+            active = False
+        elif not node.status_address:
+            active = False
+        else:
+            try:
+                channels = ka9q.discover_channels_native(
+                    node.status_address, listen_duration=STATUS_DISCOVERY_SEC
+                )
+                active = bool(channels)
+            except Exception:
+                active = False
 
         return {
             "node_id": node.node_id,
             "service": f"radiod@{node.radiod_instance}",
-            "active": active,
-            "control_socket_reachable": socket_open,
+            "active": "active" if active else "inactive-or-unreachable",
+            "control_socket_reachable": active,
         }
 
     def set_frequency(self, node: RadiodNode, frequency_hz: float, mode: str) -> dict[str, Any]:

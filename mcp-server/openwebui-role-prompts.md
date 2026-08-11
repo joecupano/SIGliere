@@ -1,54 +1,57 @@
 # Open WebUI Role Provisioning — analyst / operator
 
-**Status as of 2026-08-08:** confirmed running **Open WebUI 0.11.0**.
-Token infrastructure, both connections (analyst + operator), and a CORS
-bug that was blocking the browser from reaching the MCP server are all
-live and operator-confirmed working (see `docs/mcp-validation-evidence.md`'s
-2026-08-08 entries — search for "CORS Bug" for the connection fix). What's
-**left**: creating the two Open WebUI Groups and scoping each connection's
-visibility to its group (Steps 2–3 below). That needs the operator's
-Admin Panel login — no agent working on this repo has (or should have)
-that login; see Guardrail 7 in the project handoff doc.
+**Status as of 2026-08-11:** running **Open WebUI 0.11.0**. Read-only
+access (analyst) is a registered OpenAPI Tool Server connection, done and
+working. Tuning access (operator) is **not** a connection at all — it's a
+native in-process tool that checks the calling user's group membership in
+code — because the approach this doc originally described (scope a shared
+connection to a group) turned out not to exist in this build. See
+"History: why this doc changed" below before reusing that old approach
+for anything else.
 
-Steps 0–1 below are pinned to this specific 0.11.0 build, verified by
-reading its installed source in the running container
-(`podman exec open-webui ...` against `/app/backend/open_webui/`), not
-guessed from generic Open WebUI docs — see the file/line citations
-throughout.
+`SIGLIERE_MCP_DRY_RUN` is currently `false` (production) — see
+`docs/mcp-validation-evidence.md`'s 2026-08-11 entries for the full flip
+history, including a mid-session revert back to dry-run while the gap
+below was open.
 
-## Step 0 — Generate the two connection blocks
+## Step 0 — Generate the analyst connection block
 
 0.11.0's Admin Panel only offers **Type = OpenAPI** for tool server
 connections (no MCP/Streamable HTTP option in this build — confirmed by
 the operator's own UI and by the absence of an MCP entry point in that
 form). The MCP server is a FastAPI app and already serves its own
-`/openapi.json`, so register it as an OpenAPI connection instead:
+`/openapi.json`, so register the **analyst** endpoint as an OpenAPI
+connection:
 
 ```bash
-bash scripts/openwebui-mcp-openapi-command.sh
+bash scripts/openwebui-mcp-openapi-command.sh analyst
 ```
 
-prints one paste-ready block for **analyst** and one for **operator**
-(`Type: OpenAPI` / `Name` / `URL` / `OpenAPI Spec URL` / `Auth: Bearer` +
-token), each carrying its own real bearer token pulled live from
-`~/.config/sigliere/mcp.env`'s `SIGLIERE_MCP_TOKENS_JSON`. Pass `analyst`
-or `operator` as an argument to print just one block.
+prints one paste-ready block (`Type: OpenAPI` / `Name` / `URL` /
+`OpenAPI Spec URL` / `Auth: Bearer` + token), carrying the real analyst
+bearer token pulled live from `~/.config/sigliere/mcp.env`'s
+`SIGLIERE_MCP_TOKENS_JSON`.
+
+**Do not also generate/register an `operator` connection this way** — see
+Step 2. `scripts/openwebui-mcp-openapi-command.sh operator` still works
+and still prints a valid block (useful for the CLI / `operator_cli.py`
+path, or for direct `curl` testing), but pasting it into Admin Panel ->
+Tool Servers is exactly the setup that was tried and removed — read on
+before doing that again.
 
 (There is also `scripts/openwebui-mcp-command.sh`, which prints
 `Type: MCP / Streamable HTTP` blocks — keep that around in case a future
 Open WebUI upgrade adds native MCP connection support, per
 `docs/openapi-to-mcp-migration.md`, but it's not usable on this build.)
 
-## Step 1 — Register both as separate connections in Open WebUI (done, confirmed 2026-08-08)
+## Step 1 — Register the analyst connection (done, confirmed 2026-08-08)
 
 **Admin Panel → Settings → Tools → Tool Servers** (confirmed exact label:
-the string `"Tool Servers"` is in this build's compiled frontend) → add a
-connection for each of the two Step 0 blocks. In the "Edit Connection"
-form: `URL` = the base URL, `Auth` = `Bearer` + the token, then under
-**Advanced → OpenAPI Spec URL** = the `/openapi.json` URL. You should end
-up with two distinct entries, e.g. "SIGINT MCP (Analyst)" and
-"SIGINT MCP (Operator)" — do **not** merge them into one connection with
-one token; the whole point is that they carry different tokens.
+the string `"Tool Servers"` is in this build's compiled frontend) → add
+the Step 0 block. In the "Edit Connection" form: `URL` = the base URL,
+`Auth` = `Bearer` + the token, then under **Advanced → OpenAPI Spec URL**
+= the `/openapi.json` URL. You should end up with one entry, e.g.
+"SIGINT MCP (Analyst)".
 
 If this shows **"Failed to connect to ... OpenAPI tool server"**: that
 was a real bug (CORS preflight `OPTIONS /openapi.json` getting FastAPI's
@@ -61,85 +64,133 @@ check `journalctl --user -u sigliere-mcp` for `OPTIONS ... 405` lines and
 `journalctl --user -u open-webui` for context first, rather than assuming
 it's a token or URL typo.
 
-## Step 2 — Create the two groups
+There is (as of 2026-08-11) **no "SIGINT MCP (Operator)" connection** —
+it was created, then deleted once the access-control gap below was
+found. Do not re-create it without solving that gap again first.
 
-**Admin Panel → Users → Groups** → **"Create Group"** button (confirmed
-exact label in this build's frontend). Create:
-- `analyst` — read-only MCP access
-  (`mcp_list_nodes`, `mcp_route_frequency`, `mcp_radiod_status`).
-- `operator` — read + tuning access (adds `mcp_set_frequency` /
-  `POST /set_frequency`). Approved radio operators only.
+## Step 2 — Create the two groups (done, confirmed 2026-08-11)
 
-Name and description are the only required fields; leave "Permissions"
-at its defaults (that field controls group-wide feature access like chat
-sharing, not per-connection visibility — see Step 3). Add members from
-each group's own page after creating it.
+**Admin Panel → Users → Groups** → **"Create Group"** button. This repo's
+actual groups, confirmed live against the running database:
+- `Analyst` — read-only MCP access
+  (`mcp_list_nodes`, `mcp_route_frequency`, `mcp_radiod_status`), via the
+  Step 1 connection.
+- `Operator` — tuning access, via the native tool in Step 3, not a
+  connection. Approved radio operators only.
 
-## Step 3 — Scope each connection to its group
+(Capitalization matters if you're checking membership in code —
+`openwebui-tools/sigint_operator_tool.py`'s group-name compare is
+case-insensitive as a safety net, but match the real names above rather
+than relying on that.)
 
-**Important, verified against this build's source (was wrong in an
-earlier draft of this doc):** a Tool Server connection with **no access
-grants configured is private — visible to admins only**, not public to
-everyone by default
-(`open_webui/utils/access_control/__init__.py`'s `has_connection_access`:
-"Missing, None, or empty access_grants → private, admin-only"). So **both**
-connections need an explicit grant, or non-admin users will see neither
-one, analyst included:
+Name and description are the only required fields; leave "Permissions" at
+its defaults (that field controls group-wide feature access like chat
+sharing and the `Direct Tool Servers` on/off switch — see "History"
+below — not per-connection visibility, which doesn't exist as a control
+in this build). Add members from each group's own page after creating it.
 
-- "SIGINT MCP (Analyst)" connection → grant read access to the `analyst`
-  group.
-- "SIGINT MCP (Operator)" connection → grant read access to the
-  `operator` group only.
+## Step 3 — Install the operator tool (replaces the old "scope the connection" step)
 
-Look for an **"Access Control"** control on each connection in the Tool
-Servers list (confirmed string exists in this build; it's the same
-sharing mechanism Open WebUI uses for Models/Knowledge elsewhere — a
-lock/share icon, Private vs. custom-access with a group/user picker).
-Exact icon placement on the Tool Servers list row isn't independently
-screenshotted in this doc — if you can't find it from the list view, try
-each connection's own edit dialog.
+Instead of restricting a shared connection (not possible in this build —
+see History), operator access is a **native Python tool** that checks who's
+asking on every single call, in code, using Open WebUI's own internal
+Groups model — verified live against this host's installed
+`open_webui/models/groups.py`.
 
-**What it's actually setting, if you want to verify directly:** each
-connection is one entry in `Config['tool_server.connections']`
-(`GET /api/v1/configs/tool_servers` as an admin). The access state lives
-at `connection.config.access_grants`, a list of grant objects shaped like
-`{"principal_type": "group", "principal_id": "<group-id>", "permission": "read"}`.
-Group IDs come from `GET /api/v1/groups/` (also admin-only). If the UI
-control is ever hard to locate, an admin with a personal API key (**user
-menu → Settings → Account → API Keys**, not tested against this build by
-this agent — verify it exists there before relying on it) could set this
-directly via `POST /api/v1/configs/tool_servers` with the full
-`TOOL_SERVER_CONNECTIONS` list (including the untouched entries — this
-endpoint replaces the whole list, it doesn't patch one entry) carrying
-the updated `access_grants`. This fallback is **unverified** — worked out
-by reading the source, not exercised live, since this agent has no Open
-WebUI login. Prefer the UI path; only reach for this if the UI control
-genuinely can't be found.
+1. **Workspace → Tools → "Create new tool"** → paste in the full contents
+   of `openwebui-tools/sigint_operator_tool.py`.
+2. Open its **Valves** (gear icon) and set `MCP_OPERATOR_TOKEN` to the
+   operator token from `~/.config/sigliere/mcp.env`'s
+   `SIGLIERE_MCP_TOKENS_JSON`. Every method in the tool fails closed
+   (refuses) if this is empty — it does not fall back to a weaker check.
+   Leave `MCP_BASE_URL` and `OPERATOR_GROUP_NAME` at their defaults —
+   both confirmed correct for this host as of 2026-08-11.
+3. `ALLOW_ADMIN_ROLE` (default `true`): any Open WebUI account with
+   `role=admin` may use the tool even if not personally in the `Operator`
+   group, checked against Open WebUI's own built-in role field (separate
+   from group membership). Set `false` if you want admins to also need
+   actual group membership.
+4. Optional, not required for safety: this tool's own Workspace → Tools
+   list entry may have a working Access Control / share option (native
+   Tools have a real `AccessGrants` system wired up server-side,
+   confirmed via `open_webui/models/tools.py` — unlike Direct Tool Server
+   connections, see History). Scoping it to the `Operator` group there
+   too costs nothing and hides it from others' tool pickers, but the
+   actual authorization is the in-code group check regardless of that
+   setting — never treat that UI control as the real gate.
+5. Attach the tool to a Model, or leave it globally available — the code
+   denies non-operators either way, so global availability just means
+   non-operators can see it listed and get a clean refusal, not that
+   they can use it.
+
+Group membership is re-checked on **every call**, not cached — removing
+someone from `Operator` takes effect on their very next tool call, no
+Open WebUI restart or re-login required.
 
 ## Step 4 — Assign users
 
-Default users → `analyst` group. Add someone to `operator` only against a
+Default users → `Analyst` group. Add someone to `Operator` only against a
 documented change request (Prompt 3 below) — this is an access-escalation
-decision, not a routine one.
+decision, not a routine one. Full admins get tuning access automatically
+via `ALLOW_ADMIN_ROLE` (Step 3.3) regardless of group membership, unless
+that valve is turned off.
 
-## Defense in depth, not the only gate
+## Defense in depth — now two independent layers, not one
 
-Steps 1–3 control what a user sees/can attach in Open WebUI's UI. The
-actual authorization boundary is enforced **server-side**, independent of
-Open WebUI: `sigliere_mcp_server.py`'s `require_role`/`_mcp_auth` reject
+The MCP server itself is still the authoritative boundary, unchanged from
+before: `sigliere_mcp_server.py`'s `require_role`/`_mcp_auth` reject
 `set_frequency`/`mcp_set_frequency` for any token whose mapped role isn't
-`operator`, regardless of which connection or client called it. Confirmed
-live 2026-08-08, server still in dry-run mode:
+`operator`, regardless of which caller presents it. Confirmed live
+2026-08-08 (server was in dry-run mode for this specific test; the role
+gate itself doesn't depend on dry-run state):
 
 | Token role | `POST /set_frequency` | 
 |---|---|
 | analyst | **403** (role analyst lacks operator permission) |
 | operator | **200** |
 
-So a misconfigured or skipped Step 3 is a usability/exposure problem (an
-analyst could see a connection meant for operators, or — per the
-corrected default above — nobody but the admin sees either connection),
-not a safety hole: the server refuses the tuning call either way.
+**As of 2026-08-11 there's a second, independent layer on top of that:**
+the operator bearer token itself now lives only inside
+`sigint_operator_tool.py`'s admin-only Valves — no Open WebUI user can
+reach it directly the way they could with a shared connection, and the
+tool's own code re-checks the calling user's group/role before ever
+using that token. So a misconfiguration here (e.g. leaving
+`ALLOW_ADMIN_ROLE` on when you didn't mean to) is still a real thing to
+get right, but the blast radius of getting Open WebUI's *own* sharing
+settings wrong — the failure mode this whole doc used to be about — is
+gone, because there's no shared connection left to misconfigure.
+
+## History: why this doc changed (read before reusing the old approach)
+
+The original plan (Steps 2–3 through 2026-08-08) was to register the
+operator endpoint as a Direct Tool Server connection and restrict it to
+the `Operator` group via that connection's own Access Control setting —
+the same sharing mechanism Models/Knowledge use. Checked live
+2026-08-11, operator driving the browser, this agent with no login of
+its own:
+
+- No Access Control / share icon anywhere on the Tool Servers list row
+  or its edit dialog — confirmed by direct inspection, not by source
+  reading (the dialog only has `Type`/`Name`/`Description`/`URL`/`Auth`/
+  `API Key`/`OpenAPI Spec`).
+- Group `Permissions` has a `Direct Tool Servers` toggle, but it's
+  all-or-nothing (can this group use ANY registered connection at all),
+  not per-connection.
+- Models can only attach the native Python `Tools`, not Direct Tool
+  Server connections at all — confirmed by the tool picker only ever
+  showing the four existing SIGINT tools, never an MCP connection.
+
+Net effect: once a Direct Tool Server connection is registered globally,
+any user with the (default-on) `Direct Tool Servers` permission could
+enable and use it themselves — including one carrying an operator bearer
+token — regardless of Open WebUI group membership. The
+"SIGINT MCP (Operator)" connection was deleted for exactly this reason,
+replaced by the native tool in Step 3. Full investigation trail:
+`docs/mcp-validation-evidence.md`, 2026-08-11 entries.
+
+**If you're tempted to scope a Direct Tool Server connection to a group
+for anything else in the future: don't, on this Open WebUI version.** Use
+the native-tool-with-code-check pattern instead.
 
 ---
 
@@ -163,6 +214,11 @@ Grant operator access to all Sigliere MCP tools:
 - mcp_radiod_status
 - mcp_set_frequency
 
+(Realized as of 2026-08-11 via `openwebui-tools/sigint_operator_tool.py`'s
+`list_sdr_nodes`/`set_sdr_frequency` methods plus the existing analyst
+connection for the read-only three — not via a Direct Tool Server
+connection scoped to an operator role/group, see History above.)
+
 ### Prompt 3: user assignment policy
 
 Assign default users to analyst role unless there is an explicit operational requirement.
@@ -176,7 +232,8 @@ Rotate operator tokens on schedule and after staffing changes.
 Never paste operator tokens into shared channels or role descriptions.
 
 `~/.config/sigliere/mcp.env` is already `0600` (owner-only). The "store
-separately" intent is really about where the *operator* token ends up
-being pasted in Open WebUI — Step 1's two-connection split keeps it out of
-the analyst-visible connection entirely, so it's never sitting in a tool
-description or config surface analyst-group users can read.
+separately" intent is realized more strongly than originally planned: the
+operator token isn't just in a separate *connection* from the analyst
+token (the original plan) — as of 2026-08-11 it isn't in any
+Open-WebUI-user-visible surface at all, only in
+`sigint_operator_tool.py`'s admin-only Valves.

@@ -14,7 +14,7 @@
     {
       "node_id": "hackrf-vhf-uhf",
       "kind": "hackrf",
-      "radiod_instance": "hackrf-vhf-uhf",
+      "radiod_instance": "hackrf-2m",
       "host": "127.0.0.1",
       "port": 5001,
       "status_address": "239.172.80.224",

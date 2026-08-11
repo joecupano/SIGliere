@@ -1737,3 +1737,269 @@ suspect). Neither tried yet — both need another `sudo systemctl
 restart radiod@hackrf-2m` cycle, not run without asking first.
 `DEVICE_PROFILES["hackrf"]`'s threshold remains uncalibrated; do not
 calibrate against this reading until one of the above is ruled out.
+
+## 2026-08-11 MCP Production Flip, Open WebUI Access-Control Investigation, and `radiod_status` Fix
+
+- Scope: flipped `SIGLIERE_MCP_DRY_RUN` to `false`; investigated how to
+  restrict operator-level (`set_frequency`) access within Open WebUI;
+  built a replacement mechanism after the intended one turned out not to
+  exist in this build; fixed two real, unrelated bugs found along the way
+  (`nodes.json` naming mismatch, `radiod_status`'s liveness check).
+
+### Production flip
+
+`~/.config/sigliere/mcp.env`: `SIGLIERE_MCP_DRY_RUN` -> `false`,
+`sigliere-mcp.service` restarted, confirmed via `GET /healthz` ->
+`"dry_run": false`. Later toggled back to `true` mid-session while the
+access-control gap below was open, then back to `false` once the
+replacement was built and verified — see below for why.
+
+### Open WebUI 0.11.0: per-connection group scoping does not exist in this build
+
+The original plan (`mcp-server/openwebui-role-prompts.md` Steps 2-3) was
+to register the MCP operator endpoint as a "Direct Tool Server"
+connection and restrict it to the `Operator` group via that connection's
+own Access Control setting, the same mechanism Models/Knowledge use.
+Checked live, operator driving the browser while this agent had no login
+of its own — confirmed absent by elimination, not by reading docs:
+
+- No Access Control / share icon anywhere on the Tool Servers list row
+  or its edit dialog (`Type`/`Name`/`Description`/`URL`/`Auth`/`API
+  Key`/`OpenAPI Spec` — nothing else present).
+- Group `Permissions` has a `Direct Tool Servers` toggle, but it's
+  all-or-nothing (can this group use ANY registered connection at all),
+  not per-connection. Already on by default for the `Analyst` group.
+- Models can only attach the native Python `Tools` (Workspace -> Tools),
+  not Direct Tool Server connections at all — confirmed by the operator's
+  own screen showing only the four existing SIGINT tools in that
+  picker, never the MCP connections.
+- `Settings -> Integrations -> Tools` (a personal, per-user page) showed
+  both the Analyst and Operator connections with individual on/off
+  toggles — but this does not prove per-user privacy either way (tested
+  from the admin's own account, which isn't a clean signal), and was
+  superseded by the fix below before being resolved further.
+
+**Net effect:** once a Direct Tool Server connection is registered
+globally, any user with the (default-on) `Direct Tool Servers` permission
+can enable and use it themselves — including one carrying an operator
+bearer token, regardless of Open WebUI group membership. The
+"SIGINT MCP (Operator)" connection was **deleted** from Admin Panel ->
+Settings -> Tools -> Tool Servers for exactly this reason. The
+"SIGINT MCP (Analyst)" connection was left in place (read-only
+capabilities, low risk either way).
+
+### Replacement: a native in-process tool enforcing the check in code
+
+Built `openwebui-tools/sigint_operator_tool.py` — same in-process-tool
+pattern as the existing four SIGINT tools, not an external OpenAPI
+connection. Holds the operator bearer token in its own admin-only
+`Valves` (confirmed live against this host's installed
+`open_webui/routers/tools.py`: viewing/editing a tool's Valves requires
+being its creator, an explicit `write` access grant, or `role == admin`
+— not exposed to a regular user by default). On every call, checks the
+calling user's live group membership via Open WebUI's own internal
+model, confirmed against this host's installed
+`open_webui/models/groups.py`: `Groups = GroupTable()` is a module-level
+singleton; `await Groups.get_groups_by_member_id(user_id)` returns
+`list[GroupModel]`, each with a plain `.name`. The `__user__` dict tool
+methods receive is sourced from `user.model_dump()` server-side
+(`utils/tools.py`), not something a chat user can forge.
+
+**Two real bugs caught by testing against the live database before
+shipping, not assumed:**
+1. First draft's default group name was `"operator"` (lowercase). The
+   real group in this database is `"Operator"` (capital O) — confirmed
+   via `Groups.get_groups_by_member_id()` against real accounts
+   (`myoperator` -> `['Operator']`, `myanalyst` -> `['Analyst']`). Would
+   have silently locked out every real operator. Fixed: default changed
+   to `"Operator"`, comparison made case-insensitive.
+2. Added `ALLOW_ADMIN_ROLE` valve (default `true`) per operator request
+   — full Open WebUI admins bypass the group check via `__user__["role"]
+   == "admin"` (Open WebUI's own built-in role field, confirmed via
+   `UserModel.role` in `models/users.py`), a separate check from group
+   membership so it can't be defeated by group misconfiguration.
+
+**Verified live, three ways, before calling it done:**
+- Simulated auth check against real accounts (`podman exec`, imported
+  `Groups` directly): `myoperator` allowed, `myanalyst` denied, `joe`
+  (admin, not in the group) denied — then allowed once
+  `ALLOW_ADMIN_ROLE` was added.
+- Loaded the literal saved file fresh (not a hand-typed simulation) and
+  called `list_sdr_nodes`/`set_sdr_frequency` for both `myoperator` and
+  `myanalyst` — operator succeeded (including a real dry-run response
+  from the MCP server), analyst was cleanly refused before any MCP call
+  was attempted.
+- Operator drove an actual chat as `myoperator`: "set the HackRF to
+  146.97 NFM" correctly invoked the tool, reached the MCP server, and
+  returned/explained the dry-run response — the one thing this agent
+  could not verify itself (no Open WebUI login), confirmed by the
+  operator directly.
+
+Network path note: `MCP_BASE_URL` defaults to
+`http://host.containers.internal:8140`, NOT `127.0.0.1` — confirmed live
+that `open-webui.container` is bridge-networked (`PublishPort=...`), not
+host-networked like `sigliere-mcp.container` (`Network=host`), so
+`127.0.0.1` from inside Open WebUI's container would not reach it.
+
+### Bug found and fixed: `nodes.json` `radiod_instance` naming mismatch
+
+`mcp-server/config/nodes.json`'s `hackrf-vhf-uhf` node had
+`"radiod_instance": "hackrf-vhf-uhf"` — but the real systemd unit on this
+host is `radiod@hackrf-2m` (see the 2026-08-11 HackRF multi-profile
+entries above). Pre-existing, unrelated to today's other changes. Fixed:
+`radiod_instance` -> `"hackrf-2m"`. Confirmed the token-matching fallback
+in `_resolve_status_address()` (which reads `radiod_instance` too) never
+executes for this node since `status_address` is already explicitly set
+in the config — safe change, no other code path affected. Required a
+`sigliere-mcp.service` restart to pick up (nodes.json is read once at
+process startup via `SIGLIERE_MCP_NODES_JSON`).
+
+### Bug found and fixed: `radiod_status` / `service_state()` never actually worked
+
+Fixing the naming mismatch alone did not fix `GET /radiod_status/*` — it
+still returned `"active":"error:FileNotFoundError"` for **both** nodes,
+including `rx888-hf`, whose name was never wrong. Root cause: two
+separate, deeper problems, neither related to naming:
+
+1. `service_state()` shelled out to `systemctl is-active
+   radiod@<instance>`. Confirmed live: `systemctl` does not exist inside
+   the `sigliere-mcp` container at all (`which systemctl` -> not found).
+   This could never have worked on this containerized deployment,
+   regardless of the instance name.
+2. It also probed a plain TCP connection to `node.host`/`node.port`
+   (`127.0.0.1:5000`/`5001` from `nodes.json`). Confirmed via source read:
+   nothing in this codebase ever listens there — those fields have no
+   other use anywhere in `radiod_adapter.py`. radiod exposes no TCP
+   control port; its real control/status channel is UDP multicast.
+
+**Fix attempt 1 (wrong, caught by testing): hand-rolled raw-socket
+multicast join.** Passively joined `node.status_address` on port 5006
+(`_ka9q-ctl._udp`, confirmed via this host's own `avahi-publish-service`
+output) and waited for any packet. Reliably received **nothing** — even
+with a 15-second window, even using `ka9q-python`'s own purpose-built
+`StatusListener` class doing the same thing. Root cause not fully pinned
+down (this host's radiod publishes status with TTL=0 restricted to
+loopback, per a warning `discover_channels_native` itself prints — the
+raw-socket join was evidently not handling that correctly, and the exact
+mechanism wasn't chased further once a working alternative was found).
+
+**Fix attempt 2 (correct, verified): `ka9q.discover_channels_native()`.**
+Same SDK already imported and trusted elsewhere in this file (for
+`_resolve_status_address()`'s discovery fallback). Confirmed live: found
+all 5 configured channels on `hackrf-2m` and all ~16 on `rx888-hf`,
+reliably, in as little as 1.0s; found 0 channels against a deliberately
+bogus multicast address (negative case, also verified, not assumed).
+`service_state()` now calls this with a 1.5s listening window
+(`STATUS_DISCOVERY_SEC`) and reports `active` based on whether any
+channel was found. Rebuilt `localhost/sigliere-mcp:latest`, restarted
+`sigliere-mcp.service`, confirmed live: both nodes now correctly report
+`"active":"active"`, `"control_socket_reachable":true`.
+
+### Open items
+
+- `Settings -> Integrations -> Tools`'s exact semantics (whether it's
+  truly per-user private, or mirrors the global list) was never resolved
+  — superseded by the native-tool fix, not worth chasing further unless
+  the native-tool approach is abandoned later.
+- `mcp-server/openwebui-role-prompts.md` Steps 2-3 (group-scope a Direct
+  Tool Server connection) are now known **not to work** for the operator
+  capability in this build and should not be attempted again for it —
+  that file has not yet been corrected to say so explicitly.
+
+## 2026-08-11 ka9q-radio Build Pin Refreshed, and a Directly-Relevant Upstream Finding
+
+- Scope: `scripts/phase6-ka9q-radio.sh`'s pinned `KA9Q_COMMIT` was 9
+  months stale (2025-11-08); checked against GitHub's live API before
+  touching anything, not assumed.
+
+### The pin was genuinely stale, and the original pinning reason is still real
+
+Confirmed via `git log -1` on this host's actual installed source
+(`/opt/sovereign-sigint/src/ka9q-radio`) that `e1224dcd...` really was
+what got built, not just what the script claimed. Checked current
+upstream `main` (`1c0a4231d2...`, 2026-08-10) before re-pinning to it:
+its Makefile still defaults `ENABLE_FOBOS ?= 1` — the exact flag whose
+missing third-party header (`fobos.h`) originally motivated pinning at
+all, confirmed neither `libfobos` nor `libhydrasdr` (also now
+default-on upstream, same risk) are apt-installable or present anywhere
+on this host. Both explicitly disabled in the rebuilt `make` invocation
+(`ENABLE_FOBOS=0 ENABLE_HYDRASDR=0`); every other `ENABLE_*` flag's
+headers are already installed by this script or need no vendor SDK, so
+left at upstream defaults.
+
+### Directly relevant to the RTL-SDR descope: issue #239 status, read carefully
+
+While checking recent upstream activity, found that
+[ka9q/ka9q-radio#239](https://github.com/ka9q/ka9q-radio/issues/239) —
+this project's own filed report, the exact command-queue bug behind the
+RTL-SDR AI/MCP descope (see the 2026-08-06 entries above and
+`docs/ka9q-radio-upstream-issue-command-queue.md`) — was closed
+2026-08-10. Read the actual comment thread rather than trusting the
+"closed" status alone:
+
+- Karn identified the reporter was building from `e1224dcd` ("a really
+  old commit, from last November") and said the real fix lives in his
+  **`setup-restructure`** branch, not yet merged to `main` ("probably
+  going to merge it back into main soon").
+- The issue was closed by the reporter agreeing to try that branch and
+  file a new issue if it doesn't hold up — **not** because the fix has
+  been confirmed working by anyone. As of this entry, nobody has tested
+  it.
+
+**Decision (operator, this session): re-pin to current `main` tip only.**
+This does NOT include the `setup-restructure` fix (unmerged). The
+RTL-SDR descope is NOT reconsidered by this pin update — that would need
+its own deliberate build-and-retest against `setup-restructure`
+specifically, not assumed from a version bump. Noted as a real, open
+follow-on if/when that branch merges to main or gets independently
+verified.
+
+### Not done this session
+
+The pin was updated in the script only. The actual installed build on
+this host (`/opt/sovereign-sigint/src/ka9q-radio`, and the running
+`radiod@rx888-hf`/`radiod@hackrf-2m` binaries) still reflects the OLD
+November commit — re-running `sudo ./scripts/phase6-ka9q-radio.sh`
+would rebuild and require restarting both live, currently-production
+(non-dry-run) radiod instances, which needs the operator's own sudo and
+a deliberately chosen maintenance window, not something done
+unprompted mid-session.
+
+### Update: rebuild completed and verified live (same session, continued)
+
+Operator ran `sudo ./scripts/phase6-ka9q-radio.sh`. First attempt failed
+at `sudo make install` with `fatal error: fobos.h: No such file or
+directory` — a real bug in this fix, not upstream's: `ENABLE_FOBOS=0
+ENABLE_HYDRASDR=0` had only been added to the build-step `make`
+invocation, not the separate `sudo make install` line. Confirmed root
+cause against the actual upstream source before re-fixing (not
+assumed): `src/Makefile:199` has `install: all`, and `all` conditionally
+includes `fobos.so` in `$(DYNAMIC_DRIVERS)` whenever `ENABLE_FOBOS` isn't
+explicitly `0` for *that* invocation — command-line variables don't
+carry across separate `make` calls. Fixed by repeating both flags on the
+install line; re-run succeeded.
+
+Verified live, not assumed:
+- `/opt/sovereign-sigint/src/ka9q-radio`: `git log -1` confirms
+  `1c0a4231d2...`, the new pin.
+- `/usr/local/sbin/radiod`: new binary on disk (mtime matched the build
+  run; startup banner now reads "Copyright 2026" vs. the prior
+  "Copyright 2025").
+- Caught and corrected a real mistake in earlier guidance: `systemctl
+  enable --now radiod@rx888-hf` (in the install script) does NOT restart
+  an already-active unit — confirmed via unchanged `Active: ... since`
+  timestamp after the script completed. Neither radiod instance had
+  actually loaded the new binary until the operator explicitly ran `sudo
+  systemctl restart radiod@rx888-hf` / `radiod@hackrf-2m` separately.
+- Post-restart, both confirmed on fresh PIDs (`journalctl` timestamps
+  matching the restart).
+- `scripts/phase6-ka9q-radio-validate.sh`: PASS — real 710KB WAV
+  captured from `wwv-10000-pcm.local` (not just "service active").
+- `scripts/ka9q-channel-activity-test.py --sdr hackrf-2m`: 5/5 channels
+  ACTIVE post-restart.
+- `scripts/occupancy-db-activity-test.py`: both producers still writing
+  (`rx888-hf` and `hackrf-2m`, 82 combined sightings in the prior 5
+  minutes at check time) — the rebuild did not break the DB pipeline.
+
+ka9q-radio build is now current (2026-08-10 main) and confirmed actually
+running on both radiod instances, not just installed to disk.

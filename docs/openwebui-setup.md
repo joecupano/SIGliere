@@ -100,17 +100,7 @@ the shipped defaults already match this build's mounts:
 | Whisper | `AUDIO_ROOT` | `/data/audio` |
 | MAC Vendor Lookup | `MAC_VENDOR_DB_PATH` | `/data/mac-vendors-ref/mac-vendors.json` |
 
-**Why native, not external OpenAPI/MCP:** a "native tool" is one of this
-repo's Python files in `openwebui-tools/` that runs **in-process inside the
-Open WebUI container** and reads your data directly. This build also exposes
-some of the same data through an external OpenAPI server and an MCP
-server, but local Ollama models proved **unreliable at invoking external
-HTTP tools** — they'd describe a call, decline it, or ask a clarifying
-question without ever actually issuing the request. Native in-process tools
-don't have that failure mode. See `docs/db-to-ai-query-path.md` for the full
-comparison. Prefer native tools unless a specific guide tells you otherwise.
-
-## Create a Workspace model that is tool-capable
+## Create a Workspace model
 
 ### Steps
 
@@ -125,9 +115,17 @@ configuration surface**. You need a Workspace model entry instead:
    makes local models invoke tools reliably.
 4. **Attach the tool here** (tick your installed SIGINT tool[s]).
    This makes it available **by default in every chat** with this model
-5. **Save**.
+5. **System Prompt:** open `SIGINT-analyst.system-prompt.md` in the `openwebui-prompts'
+   directory, find the section headed "COPY THIS BLOCK — PASTE INTO
+   SYSTEM PROMPT FIELD", and paste the contents of the fenced code
+   block below that heading. Before saving, replace the three
+   placeholders:
+   - `<CALLSIGN>` — your amateur radio callsign
+   - `<LOCATION>` — your grid + city (e.g. `FN21wg, Mountainville, NY`)
+   - `<TIMEZONE>` — your IANA timezone (e.g. `America/New_York`)
+6. **Save**.
 
-## Verify it fires
+## Verify everything works
 
 New chat → select your Workspace model → confirm the tool is enabled
 (Integrations, or already attached) → give a **direct, explicit**
@@ -140,8 +138,29 @@ Success looks like **"View Result from radiod_status"** (or the relevant
 tool name) appearing in the chat, followed by the model answering from real
 data. 
 
-## The tools this build installs
+## Optional: External OpenAPI connection (current occupancy path)
 
+This build also exposes occupancy/radiod read-only functions through an
+external OpenAPI server, `openapi-tools/sigint_openapi_server.py` — separate
+from, and in addition to, the native occupancy tool. Prefer the native
+tool for anything you rely on; use this connection type mainly for
+tooling that specifically expects an OpenAPI-shaped connection.
+
+### Steps
+
+1. **Admin Panel → Settings → Connections → Add Connection**, Type =
+   **OpenAPI**.
+2. **URL**: `http://<box-lan-ip>:8130`.
+3. **OpenAPI Spec URL**: `http://<box-lan-ip>:8130/openapi.json`.
+4. **Auth**: **None** (current `sigint-openapi-tools.service` deployment has
+   no auth layer).
+
+`scripts/openwebui-openapi-command.sh` prints these exact values, pre-filled
+with the box's LAN IP.
+
+## Notes
+
+## The tools this build installs
 Every file lives in `openwebui-tools/`.
 
 - **Occupancy** (`sigint_occupancy_tool.py`) — what's active on the RF
@@ -171,25 +190,15 @@ Every file lives in `openwebui-tools/`.
   call, not cached. Read the tool file's header comment before installing;
   this one has real access-control implications the read-only tools don't.
 
-## Optional: External OpenAPI connection (current occupancy path)
-
-This build also exposes occupancy/radiod read-only functions through an
-external OpenAPI server, `openapi-tools/sigint_openapi_server.py` — separate
-from, and in addition to, the native occupancy tool. Prefer the native
-tool for anything you rely on; use this connection type mainly for
-tooling that specifically expects an OpenAPI-shaped connection.
-
-### Steps
-
-1. **Admin Panel → Settings → Connections → Add Connection**, Type =
-   **OpenAPI**.
-2. **URL**: `http://<box-lan-ip>:8130`.
-3. **OpenAPI Spec URL**: `http://<box-lan-ip>:8130/openapi.json`.
-4. **Auth**: **None** (current `sigint-openapi-tools.service` deployment has
-   no auth layer).
-
-`scripts/openwebui-openapi-command.sh` prints these exact values, pre-filled
-with the box's LAN IP.
+**Why native, not external OpenAPI/MCP:** a "native tool" is one of this
+repo's Python files in `openwebui-tools/` that runs **in-process inside the
+Open WebUI container** and reads your data directly. This build also exposes
+some of the same data through an external OpenAPI server and an MCP
+server, but local Ollama models proved **unreliable at invoking external
+HTTP tools** — they'd describe a call, decline it, or ask a clarifying
+question without ever actually issuing the request. Native in-process tools
+don't have that failure mode. See `docs/db-to-ai-query-path.md` for the full
+comparison. Prefer native tools unless a specific guide tells you otherwise.
 
 **Do not mix MCP and OpenAPI endpoints in one connection.** If Type is
 OpenAPI, both URL fields must target the OpenAPI server (`:8130`) — never the

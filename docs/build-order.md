@@ -117,6 +117,18 @@ database, same pattern as Phase 6.3's SigID mirror — a weekly systemd
 identifying who makes a device from its MAC never has to leave the box.
 See `reference/mac_mirror.py` and `openwebui-tools/mac_lookup_tool.py`.
 
+## Phase 6.9 — MCP server (role-aware radiod control plane)
+```
+./scripts/phase6-mcp-server-install.sh
+./scripts/phase6-mcp-server-validate.sh
+```
+Installs `sigliere-mcp.service` as a Podman Quadlet (systemd --user),
+serving the same tuning/status surface as Phase 6.7's OpenAPI tool server
+but with bearer-token analyst/operator roles. Ships with
+`SIGLIERE_MCP_DRY_RUN=true`; only flip that to `false` in
+`~/.config/sigliere/mcp.env` after validating live control against your
+own nodes. See `mcp-server/README.md` and `docs/mcp-validation-evidence.md`.
+
 Six core phases, each depending only on what came before it. The AI stack
 (Phases 3–5) is built and proven independently of SIGINT-specific
 software (Phase 6) so the SIGINT layer can lean on already-working

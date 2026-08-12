@@ -36,6 +36,13 @@ python src/sigliere_mcp_server.py
 
 ## Container build and run
 
+The steps below (image build, env file, Quadlet) are automated by
+`scripts/phase6-mcp-server-install.sh` — see Phase 6.9 in
+`docs/build-order.md`. Prefer that script; it's idempotent (never
+overwrites an existing `mcp.env`, rebuilds the image, and restarts the
+service) and safe to re-run any time, including after a host reboot or
+crash. The manual steps are kept here for reference:
+
 ```bash
 cd /home/baldrick/sigliere
 podman build -f mcp-server/Containerfile -t localhost/sigliere-mcp:latest .
@@ -57,8 +64,14 @@ Enable quadlet:
 mkdir -p ~/.config/containers/systemd
 cp containers/sigliere-mcp.container ~/.config/containers/systemd/
 systemctl --user daemon-reload
-systemctl --user enable --now sigliere-mcp.service
+systemctl --user restart sigliere-mcp.service
 ```
+
+(Quadlet-generated units reject `systemctl --user enable` — "Unit is
+transient or generated". Start-on-boot already comes from
+`containers/sigliere-mcp.container`'s own `[Install]
+WantedBy=default.target`, wired up by the generator on every
+`daemon-reload`; use `start`/`restart` here, not `enable --now`.)
 
 ## Open WebUI integration
 

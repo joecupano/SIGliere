@@ -75,12 +75,52 @@ WantedBy=default.target`, wired up by the generator on every
 
 ## Open WebUI integration
 
-**As of 2026-08-11: only the analyst connection is registered in Open
-WebUI.** The operator (tuning) capability is a native in-process tool
-instead — `openwebui-tools/sigint_operator_tool.py` — not a registered
-connection at all. See `openwebui-role-prompts.md` for why and the full
-setup sequence; don't register an operator OpenAPI connection without
-reading that first.
+**As of 2026-08-12: the analyst connection is registered in Open
+WebUI and confirmed working, including the Admin Panel's own live
+browser-side connection test** (present in `user.settings.ui.toolServers`
+with `enable: true`; `/openapi.json` and an authenticated `/nodes` call
+both succeed). It initially failed the browser-side test — root cause
+was the `ufw` gap described just below, fixed with `sudo ufw allow
+8140/tcp`, retested and passing. If this ever regresses, the
+service-side checks passing while the *browser's* connection test still
+fails is the signature of that same firewall gap, not a bad connection
+config. The operator (tuning) capability is a native in-process tool
+instead —
+`openwebui-tools/sigint_operator_tool.py` — not a registered connection
+at all. See `openwebui-role-prompts.md` for why and the full setup
+sequence; don't register an operator OpenAPI connection without reading
+that first.
+
+**`ufw` gotcha:** this build's `ufw` default-denies inbound, and no rule
+for `8140/tcp` ships anywhere (unlike `:8130`, which
+`scripts/phase6-openapi-tools.sh` explicitly checks for). Open WebUI
+validates a Tool Server connection from the **browser**, which must
+reach the host's LAN IP on `8140` — that request crosses the real
+firewalled interface, whereas curling the same URL from this host or
+from inside the `open-webui` container routes around it and succeeds
+even when `ufw` is blocking everyone else. If the Admin Panel connection
+test fails: `sudo ufw status | grep 8140` to confirm, then
+`sudo ufw allow 8140/tcp`.
+`scripts/phase6-mcp-server-install.sh` now warns about this
+automatically (best-effort — it can't check without a cached `sudo`
+credential).
+
+**This registration does not survive an Open WebUI reset, and it's easy
+to miss that it's gone.** In this build (0.11.0), Tool Server connections
+made through Admin Panel → Settings → Tools → Tool Servers are stored
+**per-user** (`user.settings.ui.toolServers` in `webui.db`), not in the
+instance-wide config (`config` table's `tool_server.connections` key,
+which stays `[]` regardless — don't check that key, it will never show
+this). A fresh `open-webui-state` volume, a restored/reprovisioned
+instance, or a different user account all start with an empty
+`toolServers` list even while `sigliere-mcp.service` itself is healthy —
+this happened once already (registered ~08:07 on 2026-08-11, gone after
+that day's later reset, not caught until 2026-08-12). There's no install
+script for this step; re-registering means repeating the "Generate the
+analyst connection block" steps below by hand, in the browser, for
+whichever user account needs it — verify explicitly if the MCP service
+outage / reset history warrants it, don't assume DB or container health
+implies this is still registered.
 
 Generate the analyst connection block. This repo's actual Open WebUI
 0.11.0 build only offers connection **Type = OpenAPI** (no MCP/Streamable

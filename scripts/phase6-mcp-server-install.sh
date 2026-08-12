@@ -63,6 +63,23 @@ else
 fi
 
 # ---------------------------------------------------------------------
+# Preflight warning (don't fail) — same check phase6-openapi-tools.sh does
+# for :8130. Open WebUI validates a Tool Server connection from your
+# BROWSER, not from the container, so it must reach the host's LAN IP on
+# this port even though localhost/in-container curls to it already work.
+# ---------------------------------------------------------------------
+if ! sudo -n ufw status 2>/dev/null | grep -q "${PORT}/tcp"; then
+  echo "NOTE: ufw may have no ${PORT}/tcp allow rule (could not confirm"
+  echo "      without a cached sudo credential — check yourself with:"
+  echo "      sudo ufw status | grep ${PORT}). Open WebUI validates a Tool"
+  echo "      Server connection from your BROWSER, which must reach the"
+  echo "      LAN IP:${PORT} — this succeeds from localhost/in-container"
+  echo "      even when ufw blocks it from elsewhere on the LAN. If the"
+  echo "      Admin Panel connection test fails, run:"
+  echo "      sudo ufw allow ${PORT}/tcp"
+fi
+
+# ---------------------------------------------------------------------
 # Quadlet unit
 # ---------------------------------------------------------------------
 echo "-- Installing Quadlet unit --"

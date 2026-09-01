@@ -165,7 +165,7 @@ def run(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="sovereign-sigint AI ingest pipeline")
+    parser = argparse.ArgumentParser(description="Sigliere AI ingest pipeline")
     parser.add_argument("--dry-run", action="store_true", help="report only, don't process")
     parser.add_argument("--once", action="store_true", help="no-op flag for clarity in systemd unit")
     parser.add_argument("--corpus-source", type=Path, default=DEFAULT_CORPUS_SOURCE)

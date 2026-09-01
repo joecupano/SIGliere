@@ -4,7 +4,7 @@ author: sigliere
 description: Identify the manufacturer behind a MAC address (or search vendors
     by name) using the local sovereign mirror of maclookup.app's OUI/CID
     database — no MAC address or vendor query ever leaves this box. Native
-    in-process Open WebUI tool, pairing with the Kismet tool's device sightings.
+    in-process Open WebUI tool.
 version: 1.0.0
 license: AGPL-3.0
 """

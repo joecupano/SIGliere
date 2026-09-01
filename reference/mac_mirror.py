@@ -71,8 +71,8 @@ BASE_URL = "https://maclookup.app"
 LANDING_PATH = "/downloads/json-database"
 
 USER_AGENT = (
-    "sovereign-sigint-mirror/1.0 "
-    "(https://github.com/joecupano/sovereign-sigint; personal MAC vendor reference mirror)"
+    "Sigliere-mirror/1.0 "
+    "(https://github.com/joecupano/Sigliere; personal MAC vendor reference mirror)"
 )
 REQUEST_TIMEOUT = 60
 
@@ -217,7 +217,7 @@ def run(output_root: Path, dry_run: bool, force: bool) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="sovereign-sigint MAC vendor database mirror")
+    parser = argparse.ArgumentParser(description="Sigliere MAC vendor database mirror")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--once", action="store_true", help="no-op flag for clarity in systemd unit")
     parser.add_argument("--force", action="store_true", help="write even if content hash is unchanged")

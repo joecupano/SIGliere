@@ -11,13 +11,12 @@ requirements: faster-whisper>=1.0.0
 #
 # WHY THIS EXISTS (SIGINT workflow context):
 #   The Analysis stage of a SIGINT workflow includes "voice translation and
-#   pattern-of-life mapping." The sovereign-sigint platform already runs
+#   pattern-of-life mapping." The Sigliere can optionally run
 #   faster-whisper on GPU in Phase 5 (ai-ingest, for /data/audio processed
 #   into /data/corpus/processed/audio/); this tool exposes the same capability
 #   to the local LLM at chat time, for ad-hoc transcription of a single audio
 #   file the operator specifies. Typical inputs:
-#     - Ham radio QSO recordings dumped from OpenWebRX+ or SDR clients
-#     - Demodulated voice audio captured via radiod's pcmrecord
+#     - Audio exported or shared by SIGedge
 #     - Broadcast/utility station recordings for transcription + translation
 #
 # HOW THIS IS DIFFERENT FROM ai-ingest's whisper pass:
@@ -289,9 +288,8 @@ class Tools:
             if not files:
                 return (f"No audio files found under '{search_dir}' "
                         f"(supported extensions: {sorted(SUPPORTED_EXTENSIONS)}). "
-                        f"Drop audio files there via a share, or record "
-                        f"directly to '{root}' from radiod (pcmrecord) or "
-                        f"OpenWebRX+.")
+                        f"Place audio exported by SIGedge or another trusted source "
+                        f"under '{root}'.")
 
             return (f"Audio files under '{search_dir}':\n"
                     + "\n".join(files)

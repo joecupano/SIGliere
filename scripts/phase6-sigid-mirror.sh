@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # scripts/phase6-sigid-mirror.sh
 #
-# Phase 6.3 — SigID mirror. See docs/build-order.md Phase 6. Sets up
-# the /data/reference/sigid layout, ensures the sigint-processing venv
+# Optional — SigID mirror. See docs/build-order.md Phase 6. Sets up
+# the /data/reference/sigid layout, ensures the reference venv
 # has `requests` (reference/sigid_mirror.py's only new dependency), and
 # installs a systemd --user timer for weekly incremental sync.
 #
@@ -24,19 +24,19 @@ if [[ "$(id -u)" -eq 0 ]]; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_PYTHON="/opt/sovereign-sigint/venvs/sigint-processing/bin/python3"
+VENV_PYTHON="${HOME}/.local/share/sigliere/venvs/reference/bin/python3"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
 
 echo "== Phase 6.3: SigID mirror =="
 
 # ---------------------------------------------------------------------
-# venv — sigint-processing already exists per docs/venvs.md; this just
-# ensures it's current with decode/requirements.txt (which now
+# The optional reference venv is kept separate from the gateway image.
+# ensures it's current with reference/requirements.txt (which now
 # includes `requests` again, for this specifically — see that file's
 # comment for why that's not a walk-back of the earlier removal).
 # ---------------------------------------------------------------------
-echo "-- Updating sigint-processing venv --"
-"${REPO_ROOT}/scripts/setup-venvs.sh" sigint-processing
+echo "-- Updating reference venv --"
+"${REPO_ROOT}/scripts/setup-venvs.sh" reference
 
 if [[ ! -x "${VENV_PYTHON}" ]]; then
   echo "ERROR: expected venv interpreter not found at ${VENV_PYTHON}" >&2

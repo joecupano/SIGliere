@@ -1,5 +1,5 @@
 [Unit]
-Description=sovereign-sigint AI ingest pipeline (Phase 5)
+Description=Sigliere AI ingest pipeline (Phase 5)
 # Deliberately no explicit dependency on Ollama/Open WebUI units — this
 # pipeline is filesystem-only and decoupled from both, per
 # docs/build-order.md Phase 5.

@@ -1,5 +1,5 @@
 [Unit]
-Description=sovereign-sigint MAC vendor database mirror sync (Phase 6.8)
+Description=Sigliere MAC vendor database mirror sync (Phase 6.8)
 
 [Service]
 Type=oneshot

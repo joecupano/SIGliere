@@ -1,0 +1,20 @@
+[Unit]
+Description=Sigliere gateway to SIGedge KA9Q multicast services
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=localhost/sigliere-gateway:latest
+ContainerName=sigliere-gateway
+Network=host
+
+Volume=__REPO_ROOT__/gateway/config:/app/config:ro
+EnvironmentFile=%h/.config/sigliere/gateway.env
+Environment=SIGLIERE_SIGEDGE_NODES=/app/config/nodes.json
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

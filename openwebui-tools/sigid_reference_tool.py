@@ -3,8 +3,8 @@ title: SIGINT SigID Reference
 author: sigliere
 description: Look up signals in the local SigID (sigidwiki) reference mirror —
     by name, frequency, or characteristics. Native in-process Open WebUI tool,
-    the third AI data source, giving the local LLM an authoritative signal
-    reference catalog to pair with live occupancy and Kismet data.
+    the optional reference source, giving the local LLM authoritative signal
+    reference data without collection-tier access.
 version: 1.0.0
 license: AGPL-3.0
 """
@@ -24,7 +24,7 @@ license: AGPL-3.0
 #   the infobox into fields so the model can do name lookup, keyword search,
 #   and (best-effort) frequency-range search.
 #
-# DEPLOYMENT (like the occupancy/kismet tools):
+# OPTIONAL DEPLOYMENT:
 #   The tool runs inside the Open WebUI container, so the SigID metadata dir
 #   must be mounted in. Add to the quadlet, e.g.:
 #     Volume=/data/reference/sigid:/data/sigid-ref:ro

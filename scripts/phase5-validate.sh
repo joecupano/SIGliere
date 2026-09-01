@@ -20,7 +20,7 @@
 
 set -uo pipefail
 
-VENV_PYTHON="/opt/sovereign-sigint/venvs/ai-ingest/bin/python3"
+VENV_PYTHON="${HOME}/.local/share/sigliere/venvs/ai-ingest/bin/python3"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 STAGE_NAME="_phase5_validate"

@@ -1,149 +1,71 @@
 # Build order
 
-## Quickstart
+## 1. Host prerequisites
 
-Bare command sequence, in order. Each phase's full rationale, exit
-criteria, and flagged unknowns are in the sections below — read those
-before debugging a failure, not just this list. Only run install
-scripts with `sudo` where shown; several are deliberately rootless.
-All commands are executed from `~\sigliere`
-
-## Phase 1 — select only the devices you actually have connected
-```
-sudo ./scripts/phase1-hardware-drivers.sh
-```
-Once completed, `reboot` the server. Once rebooted, run the following
-commands:
-```
-./scripts/phase1-validate-sdrs.sh
-./scripts/phase1-validate-protocol-tools.sh
-```
-
-## Phase 2 - install OS packages
-```
+```bash
 sudo ./scripts/phase2-os-packages.sh
 ./scripts/phase2-validate.sh
 ```
-Security hardening — recommended HERE, before Phase 3+ brings up any
-network-facing service (Ollama, Open WebUI, OpenWebRX+). See
-docs/security-hardening.md. Not phase-numbered — cross-cutting,
-applies regardless of build progress.
-```
-sudo ./scripts/security-hardening.sh
-./scripts/security-hardening-validate.sh
-```
 
-## Phase 3 - Install Ollama
-```
+This installs rootless Podman, Python, TLS utilities, and basic host tools.
+It installs no collection or DSP packages.
+
+## 2. Ollama
+
+```bash
 sudo ./scripts/phase3-ollama.sh
 ./scripts/phase3-validate.sh
 ```
 
-## Phase 4 - Install Open WebUI
-We install plain HTTP :8000 by default:
-```
-./scripts/phase4-open-webui.sh
-./scripts/phase4-validate.sh
-```
-For HTTPS see the TLS options below
-   TLS options (optional):
-     CADDY_TLS=1 ./scripts/phase4-open-webui.sh          # self-signed local CA, :8443
-     CADDY_TLS=cert CADDY_CERT=… CADDY_KEY=… CADDY_HOSTNAME=… \
-       ./scripts/phase4-open-webui.sh                    # your own certificate
-   (see docs/security-hardening.md § Caddy for details + client trust steps)
+Ollama binds to `127.0.0.1:11434`. Model storage remains under
+`/data/models`.
 
-## Phase 5 - AI Ingestion
-```
-./scripts/phase5-ai-ingest.sh
-./scripts/phase5-validate.sh
+## 3. SIGedge contract and gateway
+
+Edit `gateway/config/nodes.json` to match SIGedge's advertised status
+multicast groups and capabilities, then run:
+
+```bash
+./scripts/install-sigedge-gateway.sh
 ```
 
-## Phase 6.1 — Set up `radiod`
-```
-sudo ./scripts/phase6-ka9q-radio.sh
-./scripts/phase6-ka9q-radio-validate.sh
+The installer generates analyst and operator bearer tokens in
+`~/.config/sigliere/gateway.env` and preserves that file on subsequent runs.
+The gateway binds to `127.0.0.1:8140` and defaults to dry-run.
+
+For a remote SIGedge, verify multicast reaches this host before enabling live
+control. For same-host SIGedge, use the same contract and gateway; do not add
+local shortcuts.
+
+## 4. Open WebUI and Caddy
+
+Default internal-CA certificate:
+
+```bash
+SIGLIERE_HOSTNAME=sigliere.example.local ./scripts/install-open-webui.sh
 ```
 
-## Phase 6.2 — Setup decoders
-```
-sudo ./scripts/phase6-decode-tools.sh
-./scripts/phase6-decode-tools-validate.sh
+Operator-provided certificate:
+
+```bash
+SIGLIERE_HOSTNAME=sigliere.example.com \
+SIGLIERE_CERT=/path/fullchain.pem \
+SIGLIERE_KEY=/path/privkey.pem \
+./scripts/install-open-webui.sh
 ```
 
-## Phase 6.3 - Setup SIGid mirrion of SIGID Wiki
-```./scripts/phase6-sigid-mirror.sh
-./scripts/phase6-sigid-mirror-validate.sh
+The default is HTTPS on port 8443. There is no plain-HTTP LAN mode.
+
+## 5. Firewall and validation
+
+```bash
+sudo ./scripts/security-hardening.sh
+./scripts/security-hardening-validate.sh
+./scripts/validate-tiered.sh
 ```
 
-## Phase 6.4 — only if RTL-SDR is connected
-```
-sudo ./scripts/phase6-openwebrx.sh
-```
-Then add RTL-SDR devices manually if not already detected by OpenWebRX+
-(: web UI -> Settings -> SDR devices)
+## 6. Open WebUI tools
 
-Then we validate OpenWebRX+ install
-```
-./scripts/phase6-openwebrx-validate.sh
-```
+Follow [openwebui-setup.md](openwebui-setup.md) to install the native SIGedge
+status and operator tools and configure their tokens.
 
-## Phase 6.5 - SigMF Writer
-```
-./scripts/phase6-sigmf-writer.sh
-./scripts/phase6-sigmf-writer-validate.sh
-```
-
-## Phase 6.6 — occupancy DB schema/access-layer, then the `occupancy producer`
-```
-./scripts/phase6-occupancy-db-validate.sh
-./scripts/phase6-occupancy-producer.sh
-```
-This installs a continuous systemd --user service that sweeps radiod's
-channels into the occupancy DB, grows the sightings table; requires radiod already running
-
-## Phase 6.7 — OpenAPI tool server (Open WebUI external tool connection path)
-```
-./scripts/phase6-openapi-tools.sh
-```
-
-## Phase 6.8 — MAC vendor (OUI/CID) database mirror
-```
-./scripts/phase6-mac-mirror.sh
-./scripts/phase6-mac-mirror-validate.sh
-```
-Sovereign local mirror of maclookup.app's free MAC-address vendor
-database, same pattern as Phase 6.3's SigID mirror — a weekly systemd
---user timer, not a one-shot dump. Pairs with the Kismet tool (Phase 7):
-identifying who makes a device from its MAC never has to leave the box.
-See `reference/mac_mirror.py` and `openwebui-tools/mac_lookup_tool.py`.
-
-## Phase 6.9 — MCP server (role-aware radiod control plane)
-```
-./scripts/phase6-mcp-server-install.sh
-./scripts/phase6-mcp-server-validate.sh
-```
-Installs `sigliere-mcp.service` as a Podman Quadlet (systemd --user),
-serving the same tuning/status surface as Phase 6.7's OpenAPI tool server
-but with bearer-token analyst/operator roles. Ships with
-`SIGLIERE_MCP_DRY_RUN=true`; only flip that to `false` in
-`~/.config/sigliere/mcp.env` after validating live control against your
-own nodes. See `mcp-server/README.md` and `docs/mcp-validation-evidence.md`.
-
-Six core phases, each depending only on what came before it. The AI stack
-(Phases 3–5) is built and proven independently of SIGINT-specific
-software (Phase 6) so the SIGINT layer can lean on already-working
-ingest/OCR/audio infrastructure instead of duplicating it. A seventh
-phase (Phase 7 — RF/Protocol Security Tooling: Kismet, WiFi/BT capture)
-was added later; it sits at the packet/protocol layer, deliberately
-separate from Phase 6's spectrum-occupancy model, and depends only on the
-base OS/toolchain from Phases 1–2.
-
-## Phase 7 - Install Kismet
-```
-./scripts/phase7-kismet.sh
-./scripts/phase7-kismet-refresh.sh
-./scripts/phase7-kismet-validate.sh
-```
-
-# Phase 8 - Open Web UI Setup
-Proceed to the [OpenWeb](openwebui-setup.md) UI Setup document.

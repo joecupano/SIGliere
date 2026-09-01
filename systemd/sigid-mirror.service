@@ -1,5 +1,5 @@
 [Unit]
-Description=sovereign-sigint SigID mirror sync (Phase 6.3)
+Description=Sigliere SigID mirror sync (Phase 6.3)
 
 [Service]
 Type=oneshot

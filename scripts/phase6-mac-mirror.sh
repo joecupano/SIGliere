@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # scripts/phase6-mac-mirror.sh
 #
-# Phase 6.8 — MAC vendor (OUI/CID) database mirror. See docs/build-order.md
+# Optional — MAC vendor (OUI/CID) database mirror. See docs/build-order.md
 # Phase 6. Sets up the /data/reference/mac-vendors layout and installs a
 # systemd --user timer for weekly re-sync. reference/mac_mirror.py's only
-# dependency is `requests`, already in the sigint-processing venv from
+# dependency is `requests`, already in the reference venv from
 # Phase 6.3 (SigID mirror) — nothing new to install there.
 #
 # Run as your normal user, NOT with sudo — same rootless pattern as
@@ -25,21 +25,21 @@ if [[ "$(id -u)" -eq 0 ]]; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_PYTHON="/opt/sovereign-sigint/venvs/sigint-processing/bin/python3"
+VENV_PYTHON="${HOME}/.local/share/sigliere/venvs/reference/bin/python3"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
 
 echo "== Phase 6.8: MAC vendor database mirror =="
 
 if [[ ! -x "${VENV_PYTHON}" ]]; then
   echo "ERROR: expected venv interpreter not found at ${VENV_PYTHON}" >&2
-  echo "       Run scripts/phase6-sigid-mirror.sh (or setup-venvs.sh sigint-processing)" >&2
+  echo "       Run scripts/phase6-sigid-mirror.sh (or setup-venvs.sh reference)" >&2
   echo "       first — this mirror shares that venv." >&2
   exit 1
 fi
 
 if ! "${VENV_PYTHON}" -c "import requests" >/dev/null 2>&1; then
   echo "ERROR: 'requests' not importable in ${VENV_PYTHON}" >&2
-  echo "       Run: ${REPO_ROOT}/scripts/setup-venvs.sh sigint-processing" >&2
+  echo "       Run: ${REPO_ROOT}/scripts/setup-venvs.sh reference" >&2
   exit 1
 fi
 

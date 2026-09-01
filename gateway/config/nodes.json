@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "node_id": "sigedge-hf",
+      "label": "SIGedge HF",
+      "status_address": "239.95.191.236",
+      "min_hz": 1000000,
+      "max_hz": 30000000,
+      "modes": ["am", "usb", "lsb", "cw", "fm"],
+      "control_enabled": true
+    },
+    {
+      "node_id": "sigedge-vhf-uhf",
+      "label": "SIGedge VHF/UHF",
+      "status_address": "239.172.80.224",
+      "min_hz": 30000000,
+      "max_hz": 6000000000,
+      "modes": ["am", "usb", "lsb", "cw", "nfm", "wfm", "fm"],
+      "control_enabled": true
+    }
+  ]
+}
+

@@ -121,7 +121,7 @@ if __name__ == "__main__":
 Run it with the Phase 5 venv's Python — no separate install needed:
 
 ```
-/opt/sovereign-sigint/venvs/ai-ingest/bin/python3 ~/rag-demo/convert.py
+${HOME}/.local/share/sigliere/venvs/ai-ingest/bin/python3 ~/rag-demo/convert.py
 ```
 
 This will take a while — hundreds of pages, each going through
@@ -133,10 +133,7 @@ is expected and fine; check the `FAILED` lines but don't expect zero.
 
 Log into Open WebUI and:
 
-*(Default install: `http://<this-box-ip>:8000/` — Caddy serves plain
-HTTP on :8000 unless you opted into TLS with `CADDY_TLS=1`, in which
-case it's `https://<hostname>.local:8443/`. See docs/security-hardening.md
-for the TLS path.)*
+*(Core install: `https://<configured-hostname>:8443/`. Caddy TLS is mandatory; see docs/security-hardening.md.)*
 
 1. **Workspace → Knowledge → Create a new collection** — name it
    something like "Antenna Design (Cebik)"

@@ -1,5 +1,5 @@
 [Unit]
-Description=Run sovereign-sigint MAC vendor database mirror sync weekly
+Description=Run Sigliere MAC vendor database mirror sync weekly
 
 [Timer]
 # Weekly — the upstream database (IEEE OUI/CID assignments mirrored by

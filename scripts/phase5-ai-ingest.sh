@@ -21,7 +21,7 @@ if [[ "$(id -u)" -eq 0 ]]; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_PYTHON="/opt/sovereign-sigint/venvs/ai-ingest/bin/python3"
+VENV_PYTHON="${HOME}/.local/share/sigliere/venvs/ai-ingest/bin/python3"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
 
 echo "== Phase 5: AI ingest pipeline =="

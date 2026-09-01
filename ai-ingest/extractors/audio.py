@@ -3,9 +3,9 @@ ai-ingest/extractors/audio.py
 
 Baseline spoken-word transcription via faster-whisper. This handles
 GENERAL audio in /data/audio — not SIGINT-specific demodulated signal
-audio, which is a Phase 6 concern that reuses this same model rather
-than duplicating it (see docs/build-order.md Phase 6 and
-decode/requirements.txt).
+audio deliberately transferred from SIGedge. This reuses the same model rather
+than duplicating it; no collection or demodulation runs here (see
+ai-ingest/requirements.txt).
 """
 
 import logging

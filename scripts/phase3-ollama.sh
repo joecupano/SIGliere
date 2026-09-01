@@ -73,33 +73,16 @@ curl -fsSL https://ollama.com/install.sh | sh
 # after the fact works but means re-pointing manifests/symlinks rather
 # than just pulling clean. See docs/data-layout.md.
 # ---------------------------------------------------------------------
-echo "-- Configuring OLLAMA_MODELS=/data/models and OLLAMA_HOST --"
+echo "-- Configuring loopback-only Ollama and model storage --"
 sudo mkdir -p /etc/systemd/system/ollama.service.d
 sudo tee /etc/systemd/system/ollama.service.d/override.conf > /dev/null <<'EOF'
 [Service]
 Environment="OLLAMA_MODELS=/data/models"
-Environment="OLLAMA_HOST=0.0.0.0"
+Environment="OLLAMA_HOST=127.0.0.1:11434"
 EOF
 
-# OLLAMA_HOST=0.0.0.0 — confirmed necessary via a real install: Ollama
-# defaults to binding 127.0.0.1 only, which Open WebUI's container
-# (Phase 4) cannot reach through host.containers.internal — that
-# hostname resolves to the box's real LAN-facing IP under this rootless
-# Podman networking setup, not an isolated container-only address, so
-# loopback-only binding is unreachable from the container regardless of
-# DNS resolution working correctly.
-#
-# SECURITY IMPLICATION, stated directly rather than glossed over:
-# binding 0.0.0.0 exposes Ollama's API on the LAN itself, not just to
-# the local container — Ollama has no built-in authentication. If this
-# box sits on a network with untrusted hosts, restrict at the firewall
-# rather than leave the full LAN able to reach it, e.g.:
-#   sudo ufw allow from 127.0.0.1 to any port 11434
-#   sudo ufw deny 11434
-# (adjust the allow rule to the container's actual gateway/subnet if
-# you want the container specifically reachable without opening it to
-# the whole LAN — verify that subnet with your own network setup
-# rather than assume one here.)
+# Open WebUI reaches Ollama through Caddy's private loopback router.
+# Ollama never needs a LAN listener of its own.
 
 # /data is owned by the human operator (see scripts/setup-data-dirs.sh),
 # but Ollama's systemd service runs as its own 'ollama' system user —

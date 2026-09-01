@@ -9,7 +9,7 @@
 
 set -uo pipefail
 
-VENV_PYTHON="/opt/sovereign-sigint/venvs/sigint-processing/bin/python3"
+VENV_PYTHON="${HOME}/.local/share/sigliere/venvs/reference/bin/python3"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_ROOT="/data/reference/mac-vendors"
 DATA_FILE="${OUTPUT_ROOT}/mac-vendors.json"
@@ -20,7 +20,7 @@ echo "== Phase 6.8 validation: MAC vendor database mirror =="
 echo
 
 if [[ ! -x "${VENV_PYTHON}" ]]; then
-  echo "FAIL: sigint-processing venv not found at ${VENV_PYTHON}"
+  echo "FAIL: reference venv not found at ${VENV_PYTHON}"
   exit 1
 fi
 

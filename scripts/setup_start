@@ -1,0 +1,19 @@
+#!/bin/bash
+
+###
+### setup_start
+###
+###  20260901-2300
+###
+
+cd "$SIGLIERE_SOURCE" || return 1
+
+source <(sudo "$SIGLIERE_SCRIPTS/phase2-os-packages.sh") || return 1
+source <(sudo "$SIGLIERE_SCRIPTS/phase3-ollama.sh") || return 1
+source "$SIGLIERE_SCRIPTS/install-sigedge-gateway" || return 1
+source "$SIGLIERE_SCRIPTS/install-open-webui.sh" || return 1
+source <(sudo "$SIGLIERE_SCRIPTS/security-hardening.sh") || return 1
+source "$SIGLIERE_SCRIPTS/validate-tiered.sh" || return 1
+
+# Expose the repository command without copying it away from its support files.
+sudo ln -sfn "$SIGLIERE_HOME/SIGliere" /usr/local/bin/SIGliere

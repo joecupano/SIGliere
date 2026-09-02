@@ -3,7 +3,7 @@
 ## 1. Host prerequisites
 
 ```bash
-sudo ./scripts/phase2-os-packages.sh
+sudo ./scripts/install-os-packages.sh
 ./scripts/phase2-validate.sh
 ```
 
@@ -13,7 +13,7 @@ It installs no collection or DSP packages.
 ## 2. Ollama
 
 ```bash
-sudo ./scripts/phase3-ollama.sh
+sudo ./scripts/install-ollama.sh
 ./scripts/phase3-validate.sh
 ```
 

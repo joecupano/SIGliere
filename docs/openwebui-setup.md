@@ -39,3 +39,9 @@ Attach both tools to the desired model. Test in this order:
 Only change `SIGLIERE_GATEWAY_DRY_RUN=false` after live multicast status and
 authorization have both been verified.
 
+## Further optional tools
+
+Three more native tools — MAC vendor lookup, SigID signal reference, and
+on-demand Whisper transcription — are available but not required for a
+core install. See [optional-tools.md](optional-tools.md).
+

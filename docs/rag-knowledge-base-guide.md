@@ -36,8 +36,8 @@ any public-facing or commercial system.
 ## Architecture Note: Two Ingest Paths, and Why We're Using One Specifically
 
 This build already has a document ingest pipeline (Phase 5,
-`ai-ingest/`) — but it's deliberately **decoupled from Open WebUI's own
-chat RAG**, by design (see `docs/build-order.md` Phase 5). Phase 5's
+`ai-ingest/`, see `scripts/phase5-ai-ingest.sh`) — but it's deliberately
+**decoupled from Open WebUI's own chat RAG**, by design. Phase 5's
 output lands in `/data/corpus/processed` as a standalone corpus; nothing
 currently wires it into a chat-queryable retrieval layer.
 
@@ -192,9 +192,9 @@ happening, not just Ollama answering from general training data anyway.
 
 - **Indexing seems stuck:** check Open WebUI's own logs
   (`podman logs open-webui`) — large batches can take a while;
-  distinguish "still working" from "actually stalled" the same way
-  this build's FFTW background job taught you to (Phase 2) — check for
-  actual activity, not just elapsed time.
+  distinguish "still working" from "actually stalled" the same way you
+  would for any long-running background job — check for actual
+  activity, not just elapsed time.
 - **Answers ignore the knowledge base entirely:** confirm the `#`
   reference actually attached (it should show as a chip/tag in the
   message box before sending) and that indexing genuinely completed,

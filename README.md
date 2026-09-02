@@ -33,8 +33,8 @@ configuration shortcuts.
 Read [docs/build-order.md](docs/build-order.md). In summary:
 
 ```bash
-sudo ./scripts/phase2-os-packages.sh
-sudo ./scripts/phase3-ollama.sh
+sudo ./scripts/install-os-packages.sh
+sudo ./scripts/install-ollama.sh
 ./scripts/install-sigedge-gateway.sh
 ./scripts/install-open-webui.sh
 sudo ./scripts/security-hardening.sh

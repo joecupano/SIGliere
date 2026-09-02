@@ -8,8 +8,8 @@
 
 cd "$SIGLIERE_SOURCE" || return 1
 
-source <(sudo "$SIGLIERE_SCRIPTS/phase2-os-packages.sh") || return 1
-source <(sudo "$SIGLIERE_SCRIPTS/phase3-ollama.sh") || return 1
+source <(sudo "$SIGLIERE_SCRIPTS/install-os-packages.sh") || return 1
+source <(sudo "$SIGLIERE_SCRIPTS/install-ollama.sh") || return 1
 source "$SIGLIERE_SCRIPTS/install-sigedge-gateway" || return 1
 source "$SIGLIERE_SCRIPTS/install-open-webui.sh" || return 1
 source <(sudo "$SIGLIERE_SCRIPTS/security-hardening.sh") || return 1

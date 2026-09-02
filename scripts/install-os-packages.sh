@@ -2,7 +2,7 @@
 set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || {
-  echo "Run with sudo: sudo ./scripts/phase2-os-packages.sh" >&2
+  echo "Run with sudo: sudo ./scripts/install-os-packages.sh" >&2
   exit 1
 }
 

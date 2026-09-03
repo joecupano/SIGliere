@@ -45,8 +45,8 @@
 ###
 
 # SIGliere directory tree
-SIGLIERE_ENV_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
-SIGLIERE_HOME="$(cd -- "$(dirname -- "$SIGLIERE_ENV_FILE")/.." && pwd)"
+SIGLIERE_ENTRY="$(readlink -f "${BASH_SOURCE[0]}")"
+SIGLIERE_HOME="$(cd -- "$(dirname -- "$SIGLIERE_ENTRY")/.." && pwd)"
 SIGLIERE_ROOT=$SIGLIERE_HOME
 SIGLIERE_SOURCE=$SIGLIERE_ROOT/source
 SIGLIERE_ETC=$SIGLIERE_ROOT/etc

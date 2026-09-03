@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/phase6-sigid-mirror.sh
+# scripts/install-sigid-mirror.sh
 #
 # Optional — SigID mirror. See docs/build-order.md Phase 6. Sets up
 # the /data/reference/sigid layout, ensures the reference venv
@@ -11,9 +11,9 @@
 #
 # This script sets up the SCHEDULE. It also runs one sync immediately
 # so there's real data to validate against — run
-# scripts/phase6-sigid-mirror-validate.sh afterward.
+# scripts/validate-sigid-mirror.sh afterward.
 #
-# Usage: ./scripts/phase6-sigid-mirror.sh
+# Usage: ./scripts/install-sigid-mirror.sh
 
 set -euo pipefail
 
@@ -81,6 +81,6 @@ Check status:     systemctl --user status sigid-mirror.timer
 Run manually any time: systemctl --user start sigid-mirror.service
 View logs:         journalctl --user -u sigid-mirror.service -f
 
-Next: run scripts/phase6-sigid-mirror-validate.sh to confirm real
+Next: run scripts/validate-sigid-mirror.sh to confirm real
 content landed in /data/reference/sigid.
 EOF

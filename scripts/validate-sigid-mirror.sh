@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# scripts/phase6-sigid-mirror-validate.sh
+# scripts/validate-sigid-mirror.sh
 #
 # Phase 6.3 exit criteria: real content mirrored, AND a second run
 # demonstrably does incremental sync (near-instant, near-zero new
 # pages) rather than re-fetching everything — that's the actual point
 # of this being reusable/periodic, not just "it ran once."
 #
-# Usage: ./scripts/phase6-sigid-mirror-validate.sh
+# Usage: ./scripts/validate-sigid-mirror.sh
 
 set -uo pipefail
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# scripts/phase2-validate.sh
+# scripts/validate-os-packages.sh
 #
 # Phase 2 exit criteria per docs/build-order.md: real smoke tests, not
 # just "apt install succeeded." Run as your normal user — NOT with sudo
 # — since rootless Podman and venv creation both need to run as the
 # actual user Phase 4/5/6 services will run as.
 #
-# Usage: ./scripts/phase2-validate.sh
+# Usage: ./scripts/validate-os-packages.sh
 
 set -uo pipefail  # NOT -e — run both tests and report both results.
 

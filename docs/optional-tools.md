@@ -44,10 +44,10 @@ name) from a local mirror of the IEEE OUI/CID registry — useful for
 naming devices Kismet has already seen. Never queries an external
 lookup API.
 
-1. Run `./scripts/phase6-mac-mirror.sh` (not `sudo` — rootless, same as
+1. Run `./scripts/install-mac-mirror.sh` (not `sudo` — rootless, same as
    the other Phase 6 scripts) to populate `/data/reference/mac-vendors`
    and install a weekly `systemd --user` refresh timer. Validate with
-   `./scripts/phase6-mac-mirror-validate.sh`.
+   `./scripts/validate-mac-mirror.sh`.
 2. Add the `mac-vendors` `Volume=` line from above and restart Open WebUI.
 3. In Open WebUI, **Workspace → Tools → Create a new tool**, paste
    `openwebui-tools/mac_lookup_tool.py`.
@@ -64,9 +64,9 @@ Looks up signals by name, keyword, or frequency in a local mirror of the
 SigID (sigidwiki) catalog — the reference layer that identifies *what a
 signal is*, separate from your own capture/observation data.
 
-1. Run `./scripts/phase6-sigid-mirror.sh` (rootless) to populate
+1. Run `./scripts/install-sigid-mirror.sh` (rootless) to populate
    `/data/reference/sigid` and install its weekly refresh timer.
-   Validate with `./scripts/phase6-sigid-mirror-validate.sh`.
+   Validate with `./scripts/validate-sigid-mirror.sh`.
 2. Add the `sigid` `Volume=` line from above and restart Open WebUI.
 3. **Workspace → Tools → Create a new tool**, paste
    `openwebui-tools/sigid_reference_tool.py`.

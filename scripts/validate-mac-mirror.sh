@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# scripts/phase6-mac-mirror-validate.sh
+# scripts/validate-mac-mirror.sh
 #
 # Phase 6.8 exit criteria: real database content mirrored locally, the
 # content looks like a real MAC vendor database (not an empty/broken
 # download), and the timer is actually scheduled.
 #
-# Usage: ./scripts/phase6-mac-mirror-validate.sh
+# Usage: ./scripts/validate-mac-mirror.sh
 
 set -uo pipefail
 
@@ -87,7 +87,7 @@ echo
 
 # ---------------------------------------------------------------------
 # World-readable, matching what the Open WebUI container needs (see
-# scripts/setup-data-dirs.sh / phase6-mac-mirror.sh)
+# scripts/setup-data-dirs.sh / install-mac-mirror.sh)
 # ---------------------------------------------------------------------
 echo "-- Checking container-readability --"
 if [[ -r "${DATA_FILE}" ]] && sudo -n -u nobody test -r "${DATA_FILE}" 2>/dev/null; then

@@ -4,7 +4,7 @@
 
 ```bash
 sudo ./scripts/install-os-packages.sh
-./scripts/phase2-validate.sh
+./scripts/validate-os-packages.sh
 ```
 
 This installs rootless Podman, Python, TLS utilities, and basic host tools.
@@ -14,7 +14,7 @@ It installs no collection or DSP packages.
 
 ```bash
 sudo ./scripts/install-ollama.sh
-./scripts/phase3-validate.sh
+./scripts/validate-ollama.sh
 ```
 
 Ollama binds to `127.0.0.1:11434`. Model storage remains under
@@ -73,7 +73,7 @@ browser warning) exactly as with a hostname deployment.
 
 ```bash
 sudo ./scripts/security-hardening.sh
-./scripts/security-hardening-validate.sh
+./scripts/validate-security-hardening.sh
 ./scripts/validate-tiered.sh
 ```
 

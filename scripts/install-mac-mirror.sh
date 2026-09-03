@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/phase6-mac-mirror.sh
+# scripts/install-mac-mirror.sh
 #
 # Optional — MAC vendor (OUI/CID) database mirror. See docs/build-order.md
 # Phase 6. Sets up the /data/reference/mac-vendors layout and installs a
@@ -12,9 +12,9 @@
 #
 # This script sets up the SCHEDULE. It also runs one sync immediately so
 # there's real data to validate against — run
-# scripts/phase6-mac-mirror-validate.sh afterward.
+# scripts/validate-mac-mirror.sh afterward.
 #
-# Usage: ./scripts/phase6-mac-mirror.sh
+# Usage: ./scripts/install-mac-mirror.sh
 
 set -euo pipefail
 
@@ -32,7 +32,7 @@ echo "== Phase 6.8: MAC vendor database mirror =="
 
 if [[ ! -x "${VENV_PYTHON}" ]]; then
   echo "ERROR: expected venv interpreter not found at ${VENV_PYTHON}" >&2
-  echo "       Run scripts/phase6-sigid-mirror.sh (or setup-venvs.sh reference)" >&2
+  echo "       Run scripts/install-sigid-mirror.sh (or setup-venvs.sh reference)" >&2
   echo "       first — this mirror shares that venv." >&2
   exit 1
 fi
@@ -95,6 +95,6 @@ Next steps:
   - Mount /data/reference/mac-vendors:/data/mac-vendors-ref:ro into Open
     WebUI (containers/open-webui.container already has this) and install
     openwebui-tools/mac_lookup_tool.py per docs/openwebui-setup.md.
-  - Run scripts/phase6-mac-mirror-validate.sh to confirm real content
+  - Run scripts/validate-mac-mirror.sh to confirm real content
     landed in /data/reference/mac-vendors.
 EOF

@@ -11,7 +11,7 @@ Run:
 
 ```bash
 sudo ./scripts/security-hardening.sh
-./scripts/security-hardening-validate.sh
+./scripts/validate-security-hardening.sh
 ```
 
 ## Certificates

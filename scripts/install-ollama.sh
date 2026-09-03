@@ -6,7 +6,7 @@
 # passthrough.
 #
 # This script INSTALLS + pulls default models. Run
-# scripts/phase3-validate.sh afterward.
+# scripts/validate-ollama.sh afterward.
 #
 # Usage: sudo ./scripts/install-ollama.sh
 
@@ -154,9 +154,9 @@ ollama list
 
 cat <<EOF
 
-== Phase 3 install complete ==
+== Ollama install complete ==
 
-Next: run scripts/phase3-validate.sh to confirm GPU inference actually
+Next: run scripts/validate-ollama.sh to confirm GPU inference actually
 works and models physically live on /data/models — do not consider
-Phase 3 done until that passes.
+the Ollama install done until that passes.
 EOF

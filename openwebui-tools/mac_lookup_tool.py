@@ -124,7 +124,7 @@ class Tools:
             raise RuntimeError(
                 f"No MAC vendor database at '{self.valves.MAC_VENDOR_DB_PATH}'. "
                 "Check the valve and that reference/mac_mirror.py has run at least "
-                "once (see systemd/mac-mirror.timer / scripts/phase6-mac-mirror.sh)."
+                "once (see systemd/mac-mirror.timer / scripts/install-mac-mirror.sh)."
             )
 
     # -- tool 1: identify the vendor for a MAC address ---------------------

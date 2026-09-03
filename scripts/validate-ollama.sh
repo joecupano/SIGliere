@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# scripts/phase3-validate.sh
+# scripts/validate-ollama.sh
 #
-# Phase 3 exit criteria per docs/build-order.md: ollama run works with
+# Ollama install exit criteria per docs/build-order.md: ollama run works with
 # GPU utilization visible, and models are physically on /data/models —
 # not just "ollama pull exited 0."
 #
-# Usage: ./scripts/phase3-validate.sh
+# Usage: ./scripts/validate-ollama.sh
 
 set -uo pipefail
 
@@ -14,7 +14,7 @@ EMBED_MODEL="${EMBED_MODEL:-nomic-embed-text}"
 
 RESULTS=()
 
-echo "== Phase 3 validation =="
+echo "== Ollama validation =="
 echo
 
 # ---------------------------------------------------------------------
@@ -112,8 +112,8 @@ done
 echo
 
 if [[ "${FAILED}" -eq 1 ]]; then
-  echo "Phase 3 NOT complete — resolve failures above before Phase 4."
+  echo "Ollama validation NOT complete — resolve failures above before installing the SIGedge gateway."
   exit 1
 else
-  echo "Phase 3 exit criteria met (see PARTIAL notes above, if any)."
+  echo "Ollama validation exit criteria met (see PARTIAL notes above, if any)."
 fi

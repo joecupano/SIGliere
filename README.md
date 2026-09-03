@@ -1,51 +1,25 @@
-# Sigliere
+# SIGliere
 
-Sigliere is the sovereign AI tier for a SIGINT deployment. It runs local
+SIGliere is the sovereign AI tier for a SIGINT deployment. It runs local
 models through Ollama, provides the operator interface through Open WebUI,
 and connects to the separate **SIGedge** collection tier through authenticated
 Python tools and KA9Q multicast services.
 
-Sigliere contains no SDR drivers, DSP applications, ka9q-radio installation,
+SIGliere contains no SDR drivers, DSP applications, ka9q-radio installation,
 OpenWebRX+, Kismet, capture services, or collection hardware configuration.
 Those concerns belong exclusively to SIGedge.
 
 ## Architecture
-
-- **Caddy** is the only LAN-facing service. HTTPS is mandatory. Installation
-  uses Caddy's internal CA by default or an operator-provided certificate.
-- **Open WebUI** runs as a rootless Podman container and binds to loopback.
-- **Ollama** runs on the host and binds to loopback.
-- **SIGedge gateway** runs as a rootless, host-networked Podman container and
-  binds to loopback. It discovers and controls logical SIGedge nodes through
-  KA9Q multicast.
-- Caddy has a second loopback-only listener that routes Open WebUI to Ollama
-  and the gateway. Host APIs are never exposed directly to the LAN.
-- Native Open WebUI tools are the only LLM-facing integration path. There is
-  no duplicate OpenAPI or MCP query service.
-
-A remote SIGedge appliance and SIGedge installed on the same host use the
-same versioned node contract in [gateway/config/nodes.json](gateway/config/nodes.json).
-Co-location does not enable local service, filesystem, hardware, or radiod
-configuration shortcuts.
+See [docs/architecture.md](docs/architecture.md).
 
 ## Quick start
 
-Read [docs/build-order.md](docs/build-order.md). In summary:
+Read [INSTALL.md](INSTALL.md).
 
-```bash
-sudo ./scripts/install-os-packages.sh
-sudo ./scripts/install-corpus-dirs.sh
-sudo ./scripts/install-ollama.sh
-./scripts/install-sigedge-gateway.sh
-./scripts/install-open-webui.sh
-sudo ./scripts/install-security-hardening.sh
-./scripts/validate-tiered.sh
-```
-
-Before installing the gateway, configure SIGedge's multicast addresses and
-capabilities in `gateway/config/nodes.json`. A remote SIGedge must publish
-KA9Q multicast with a TTL of at least 1 on the intended interface; `ttl=0`
-is host-local.
+If building a two-tiered deployment (separate hosts for SIGliere and SIGedge)
+configure SIGedge's multicast addresses and capabilities in `gateway/config/nodes.json`.
+A remote SIGedge must publish KA9Q multicast with a TTL of at least 1 on the
+intended interface; `ttl=0` is host-local.
 
 ## Repository layout
 

@@ -1,5 +1,96 @@
 # Architecture Model
-SIGliere is currently a scalable two-tiered architecture.
+
+## Overview
+```
+                               LAN
+                                |
+                         HTTPS only :443
+                                |
+= = = = = = = = = = = SIGliere = = = = = = = = = = = = = = = = = = = = = =
+                                |
+                                v
+                    +------------------------+
+                    |         Caddy          |
+                    |   LAN-facing ingress   |
+                    |                        |
+                    | TLS termination        |
+                    | - Internal CA default  |
+                    | - Operator cert option |
+                    +-----------+------------+
+                                |
+                    loopback-only routing
+                         127.0.0.1 / ::1
+                                |
+              +-----------------+------------------+
+              |                                    |
+              v                                    v
+    +----------------------+             +----------------------+
+    |      Open WebUI      |             |  Caddy internal     |
+    |  Rootless Podman     |             |  loopback listener  |
+    |  Loopback bind only  |             |  not LAN accessible |
+    +----------+-----------+             +----------+-----------+
+               |                                    |
+               | Native Open WebUI tools only       |
+               |                                    |
+               +-------------------+----------------+
+                                   |
+                     +-------------+-------------+
+                     |                           |
+                     v                           |
+            +------------------+                 |
+            |      Ollama      |                 |
+            |   Host service   |                 |
+            | Loopback only    |                 |
+            +------------------+                 |
+                                                 |
+= = = = = = = = = = = SIGedge = = = = = = = = = = = = = = = = = = = = = =  
+                                                 |
+                                                 v                                               
+                                       +------------------------+
+                                       |    SIGedge Gateway     |
+                                       | Rootless Podman        |
+                                       | Host network           |
+                                       | Loopback bind only     |
+                                       +-----------+------------+
+                                                   |                                               |
+                                                   |
+                                             KA9Q multicast
+                                             discovery/control
+                                                   |
+                            +----------------------+----------------------+
+                            |                      |                      |
+                            v                      v                      v
+                    +---------------+      +---------------+      +---------------+
+                    | SIGedge Node  |      | SIGedge Node  |      | SIGedge Node  |
+                    |      A        |      |      B        |      |      N        |
+                    | logical node  |      | logical node  |      | logical node  |
+                    +---------------+      +---------------+      +---------------+
+
+Security / Integration Boundaries
+---------------------------------
+
+LAN  --->  Caddy  --->  loopback services
+
+NO LAN DIRECT ACCESS TO:
+  - Open WebUI
+  - Ollama
+  - SIGedge Gateway
+  - Host APIs
+
+LLM INTEGRATION PATH:
+  LLM
+   |
+   v
+Open WebUI
+   |
+   +--> Native Open WebUI Tools --> Ollama
+   |
+   +--> Native Open WebUI Tools --> SIGedge Gateway
+
+There is NO parallel:
+  - OpenAPI query service
+  - MCP query service
+```
 
 - SIGedge owns the complete collection tier: hardware, SDR and protocol capture,
 DSP, ka9q-radio, OpenWebRX+, Kismet, calibration, recordings, and collection storage.
@@ -8,7 +99,6 @@ DSP, ka9q-radio, OpenWebRX+, Kismet, calibration, recordings, and collection sto
 API service needed to consume authorized SIGedge services.
 
 The model is behavioral as well as organizational. SIGliere must not:
-
 - read SIGedge radiod configuration files;
 - invoke SIGedge systemd units;
 - contain receiver models, gain settings, or device profiles;

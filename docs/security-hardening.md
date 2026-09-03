@@ -10,7 +10,7 @@ and 8140 respectively.
 Run:
 
 ```bash
-sudo ./scripts/security-hardening.sh
+sudo ./scripts/install-security-hardening.sh
 ./scripts/validate-security-hardening.sh
 ```
 

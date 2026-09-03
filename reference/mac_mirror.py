@@ -191,6 +191,12 @@ def run(output_root: Path, dry_run: bool, force: bool) -> dict:
         ) as tmp:
             tmp.write(raw)
             tmp_path = Path(tmp.name)
+        # tempfile creates with mode 0600 regardless of umask, and rename
+        # preserves that — fix it up explicitly before it lands at its real
+        # name, or this mirror is unreadable by anything but the syncing
+        # user, including Open WebUI's container reading it read-only under
+        # a different, UID-mapped identity.
+        tmp_path.chmod(0o644)
         tmp_path.replace(data_path)
 
         meta_path.write_text(
@@ -205,6 +211,8 @@ def run(output_root: Path, dry_run: bool, force: bool) -> dict:
             ),
             encoding="utf-8",
         )
+        # Explicit, not umask-dependent — same reasoning as tmp_path above.
+        meta_path.chmod(0o644)
 
         manifest.record_file_synced(content_hash, len(entries), download_url)
         manifest.finish_run(run_id, "updated", len(entries), "success")

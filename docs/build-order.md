@@ -5,10 +5,19 @@
 ```bash
 sudo ./scripts/install-os-packages.sh
 ./scripts/validate-os-packages.sh
+sudo ./scripts/install-corpus-dirs.sh
 ```
 
 This installs rootless Podman, Python, TLS utilities, and basic host tools.
 It installs no collection or DSP packages.
+
+`install-corpus-dirs.sh` builds the whole `/data` corpus tree up front (see
+[data-layout.md](data-layout.md)) — not just the ai-ingest/reference-mirror
+directories used by the optional features in section 6. Every later step,
+including `install-ollama.sh`'s `/data/models`, assumes this tree already
+exists with the right ownership; running it here, before anything else
+touches `/data`, keeps that assumption true instead of leaving it to
+whichever script happens to touch `/data` first.
 
 ## 2. Ollama
 
@@ -72,7 +81,7 @@ browser warning) exactly as with a hostname deployment.
 ## 5. Firewall and validation
 
 ```bash
-sudo ./scripts/security-hardening.sh
+sudo ./scripts/install-security-hardening.sh
 ./scripts/validate-security-hardening.sh
 ./scripts/validate-tiered.sh
 ```

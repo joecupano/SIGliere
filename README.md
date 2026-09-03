@@ -34,10 +34,11 @@ Read [docs/build-order.md](docs/build-order.md). In summary:
 
 ```bash
 sudo ./scripts/install-os-packages.sh
+sudo ./scripts/install-corpus-dirs.sh
 sudo ./scripts/install-ollama.sh
 ./scripts/install-sigedge-gateway.sh
 ./scripts/install-open-webui.sh
-sudo ./scripts/security-hardening.sh
+sudo ./scripts/install-security-hardening.sh
 ./scripts/validate-tiered.sh
 ```
 

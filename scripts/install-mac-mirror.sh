@@ -44,14 +44,18 @@ if ! "${VENV_PYTHON}" -c "import requests" >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------
-# /data/reference/mac-vendors layout — created here rather than only via
-# setup-data-dirs.sh so this phase is runnable standalone; setup-data-dirs.sh
-# is idempotent and safe to re-run afterward too.
+# /data/reference/mac-vendors layout — created up front by
+# scripts/install-corpus-dirs.sh (run during host prerequisites, before
+# any of this), not here. Check rather than assume, so a skipped step
+# fails with a clear message instead of a confusing one later.
 # ---------------------------------------------------------------------
-echo "-- Creating /data/reference/mac-vendors layout --"
-mkdir -p /data/reference/mac-vendors
+if [[ ! -d /data/reference/mac-vendors ]]; then
+  echo "ERROR: /data/reference/mac-vendors does not exist." >&2
+  echo "       Run scripts/install-corpus-dirs.sh first." >&2
+  exit 1
+fi
 
-# Same reasoning as the SigID tree (scripts/setup-data-dirs.sh): the Open
+# Same reasoning as the SigID tree (scripts/install-corpus-dirs.sh): the Open
 # WebUI container reads this as a non-owner UID under rootless Podman, and
 # this is public reference data, so make the traversal path + tree
 # world-readable rather than fighting UID mapping.

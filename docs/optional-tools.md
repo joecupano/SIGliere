@@ -10,7 +10,7 @@ box.
 |---|---|---|
 | MAC Vendor Lookup | `mac_lookup_tool.py` | `/data/reference/mac-vendors` mirror (Phase 6.8) |
 | SigID Reference | `sigid_reference_tool.py` | `/data/reference/sigid` mirror (Phase 6.3) |
-| Whisper Transcription | `sigint_whisper_tool.py` | `/data/audio` (already created by `setup-data-dirs.sh`) |
+| Whisper Transcription | `sigint_whisper_tool.py` | `/data/audio` (already created by `install-corpus-dirs.sh`) |
 
 ## Mount the data in first
 
@@ -84,7 +84,7 @@ file, via `faster-whisper` on GPU — the chat-time counterpart to Phase
 immediately when asked, rather than on `ai-ingest.timer`'s schedule.
 
 1. No mirror step — `/data/audio` already exists from
-   `scripts/setup-data-dirs.sh`. Just place audio files there (`.wav`,
+   `scripts/install-corpus-dirs.sh`. Just place audio files there (`.wav`,
    `.mp3`, `.m4a`, `.flac`, `.ogg`, `.opus`).
 2. Add the `audio` `Volume=` line from above and restart Open WebUI.
 3. **Workspace → Tools → Create a new tool**, paste

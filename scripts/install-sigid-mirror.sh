@@ -44,10 +44,18 @@ if [[ ! -x "${VENV_PYTHON}" ]]; then
 fi
 
 # ---------------------------------------------------------------------
-# /data/reference/sigid layout
+# /data/reference/sigid layout — created up front by
+# scripts/install-corpus-dirs.sh (run during host prerequisites, before
+# any of this), not here. Check rather than assume, so a skipped step
+# fails with a clear message instead of a confusing one later.
 # ---------------------------------------------------------------------
-echo "-- Creating /data/reference/sigid layout --"
-mkdir -p /data/reference/sigid/{images,audio,metadata}
+for d in /data/reference/sigid/images /data/reference/sigid/audio /data/reference/sigid/metadata; do
+  if [[ ! -d "${d}" ]]; then
+    echo "ERROR: ${d} does not exist." >&2
+    echo "       Run scripts/install-corpus-dirs.sh first." >&2
+    exit 1
+  fi
+done
 
 # ---------------------------------------------------------------------
 # systemd --user timer

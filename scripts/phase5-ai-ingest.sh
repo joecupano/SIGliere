@@ -48,7 +48,7 @@ sudo apt install -y tesseract-ocr
 # ---------------------------------------------------------------------
 for d in /data/corpus/source /data/corpus/processed /data/imagery /data/audio; do
   if [[ ! -d "${d}" ]]; then
-    echo "ERROR: ${d} does not exist. Run scripts/setup-data-dirs.sh first." >&2
+    echo "ERROR: ${d} does not exist. Run scripts/install-corpus-dirs.sh first." >&2
     exit 1
   fi
 done

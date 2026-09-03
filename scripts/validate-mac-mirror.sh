@@ -87,7 +87,7 @@ echo
 
 # ---------------------------------------------------------------------
 # World-readable, matching what the Open WebUI container needs (see
-# scripts/setup-data-dirs.sh / install-mac-mirror.sh)
+# scripts/install-corpus-dirs.sh / install-mac-mirror.sh)
 # ---------------------------------------------------------------------
 echo "-- Checking container-readability --"
 if [[ -r "${DATA_FILE}" ]] && sudo -n -u nobody test -r "${DATA_FILE}" 2>/dev/null; then

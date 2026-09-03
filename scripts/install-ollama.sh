@@ -84,7 +84,8 @@ EOF
 # Open WebUI reaches Ollama through Caddy's private loopback router.
 # Ollama never needs a LAN listener of its own.
 
-# /data is owned by the human operator (see scripts/setup-data-dirs.sh),
+# /data is owned by the human operator (see scripts/install-corpus-dirs.sh,
+# which runs before this script and already created it),
 # but Ollama's systemd service runs as its own 'ollama' system user —
 # that account needs write access to /data/models specifically, or model
 # pulls will fail with a permissions error. This is a deliberate,
@@ -97,14 +98,14 @@ sudo chown -R ollama:ollama /data/models
 # Group-write + setgid on directories so that any subdirectory Ollama
 # creates on future pulls inherits the group and stays writable — prevents
 # a later pull failing with "permission denied" on a freshly-created
-# registry subpath. Consistent with scripts/setup-data-dirs.sh.
+# registry subpath. Consistent with scripts/install-corpus-dirs.sh.
 sudo chmod -R u+rwX,g+rwX /data/models
 sudo find /data/models -type d -exec chmod g+s {} \;
 
 # Chowning /data/models alone is NOT sufficient — confirmed via a real
 # install ("mkdir /data/models: permission denied: ensure path elements
 # are traversable"). /data itself is locked to o-rwx (no access outside
-# the owning user/group) per scripts/setup-data-dirs.sh, so the 'ollama'
+# the owning user/group) per scripts/install-corpus-dirs.sh, so the 'ollama'
 # user — being neither the owner nor in that group — can't even
 # traverse INTO /data to reach /data/models, regardless of what
 # /data/models itself is owned by. Fix: add 'ollama' to whatever group

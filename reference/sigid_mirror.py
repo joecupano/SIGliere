@@ -255,7 +255,12 @@ def download_file(session: requests.Session, url: str, dest: Path, manifest: Sig
         return False
 
     dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.parent.chmod(0o755)
     dest.write_bytes(resp.content)
+    # Explicit, not umask-dependent — this mirror is mounted read-only into
+    # Open WebUI's container under a different, UID-mapped identity, which
+    # needs "other" read access regardless of the syncing user's umask.
+    dest.chmod(0o644)
     manifest.record_file_synced(url, content_hash, dest)
     return True
 
@@ -282,6 +287,7 @@ def sync_page(
     safe_name = re.sub(r"[^\w\-.]", "_", title)
     metadata_path = output_root / "metadata" / f"{safe_name}.json"
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_path.parent.chmod(0o755)
     metadata_path.write_text(
         json.dumps(
             {
@@ -295,6 +301,9 @@ def sync_page(
         ),
         encoding="utf-8",
     )
+    # Explicit, not umask-dependent — see the matching comment in
+    # download_file(); same reasoning applies to every file this mirror writes.
+    metadata_path.chmod(0o644)
 
     files_synced = 0
     for file_title in page["image_titles"]:
@@ -320,6 +329,7 @@ def sync_page(
 
 def run(output_root: Path, dry_run: bool, full_resync: bool) -> dict:
     output_root.mkdir(parents=True, exist_ok=True)
+    output_root.chmod(0o755)
     manifest = SigidManifest(output_root / "manifest.db")
 
     session = requests.Session()

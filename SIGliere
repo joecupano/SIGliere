@@ -18,25 +18,16 @@
 ###          update                 check for TARGET updates
 ###          upgrade                upgrade TARGET to latest release
 ###
-###          setup
-###                 standard        First time setup for desktop
-###                 server          First time setup for server
-###                 apps            Manage applications (install/remove)
+###          setup                  First time setup
 ###
 ###          list
 ###                 packages        List all packages included with SIGliere
 ###                 installed       List installed SIGliere packages
 ###                 library         List all packages included with SIGliere with installed ones marked with an *
 ###
-###          shell           provide SIGliere env variables around a TARGET
-###
 ###       TARGET
 ###
-###          A SIGpi package
-###
-###       DEVICE
-###
-###          A support SDR device
+###          A SIGliere package
 ###
 
 
@@ -45,14 +36,12 @@
 ###
 
 # SIGliere directory tree
-SIGLIERE_ENTRY="$(readlink -f "${BASH_SOURCE[0]}")"
-SIGLIERE_HOME="$(cd -- "$(dirname -- "$SIGLIERE_ENTRY")/.." && pwd)"
-SIGLIERE_ROOT=$SIGLIERE_HOME
+SIGLIERE_ROOT=~/SIGliere
 SIGLIERE_SOURCE=$SIGLIERE_ROOT/source
 SIGLIERE_ETC=$SIGLIERE_ROOT/etc
 SIGLIERE_CONFIG=$SIGLIERE_ROOT/config
-SIGLIERE_SCRIPTS=$SIGLIERE_HOME/scripts
-SIGLIERE_DEBS=$SIGLIERE_HOME/debs
+SIGLIERE_SCRIPTS=$SIGLIERE_ROOT/scripts
+SIGLIERE_DEBS=$SIGLIERE_ROOT/debs
 
 # SIGliere install support files
 SIGLIERE_INSTALLED=$SIGLIERE_ETC/INSTALLED_PKGS
@@ -76,11 +65,11 @@ SIGLIERE_IPADDR=`ip -br address | grep UP | awk '{print $1}'`
 
 SIGEDGE_update(){
     # Check for available updates to package
-    wget https://raw.githubusercontent.com/joecupano/SIGliere/main/packages/PACKAGES -P $HOME/Downloads
+    wget https://raw.githubusercontent.com/joecupano/SIGliere/main/packages/PACKAGES -P /tmp
 
-    if grep $3 "$HOME/Downloads/PACKAGES"; then
-        SIG_PKGSTAMP=$(grep $3 "$SIGliere_HOME/packages/PACKAGES"| cut -d,-f2)
-        SIG_PKGNEW=$(grep $3 "$HOME/Downloads/PACKAGES"| cut -d,-f2)
+    if grep $2 "/tmp/PACKAGES"; then
+        SIG_PKGSTAMP=$(grep $2 "$SIGLIERE_ROOT/packages/PACKAGES"| cut -d,-f2)
+        SIG_PKGNEW=$(grep $2 "/tmp/PACKAGES"| cut -d,-f2)
         if [ "$SIG_PKGNEW" != "$SIG_PKGSTAMP" ]; then
             echo "Update $SIG_PKGNEW is available"
         else
@@ -91,10 +80,10 @@ SIGEDGE_update(){
 
 SIGEDGE_upgrade(){
     # Remove Package, update local clone, install updated package
-    cd $SIGLIERE_HOME
-    source $SIGLIERE_PACKAGES/$SPKGSCRIPT remove
+    cd $SIGLIERE_ROOT
+    source $SIGLIERE_ROOT/packages/$SPKGSCRIPT remove
     git pull
-    source $SIGLIERE_PACKAGES/$SPKGSCRIPT install
+    source $SIGLIERE_ROOT/packages/$SPKGSCRIPT install
 }
 
 ###
@@ -112,11 +101,43 @@ fi
 
 case "$1" in
     setup )
-        if [ "$2" = "apps" ]; then
-            source $SIGLIERE_SCRIPTS/setup_apps
-        elif [ "$2" = "" ]; then
-            source $SIGLIERE_SCRIPTS/setup_start $2
+        ## 1. Host prerequisites
+        sudo ./scripts/install-os-packages.sh
+        ./scripts/validate-os-packages.sh
+        sudo ./scripts/install-corpus-dirs.sh
+
+        ## 2. Ollama
+        sudo ./scripts/install-ollama.sh
+        ./scripts/validate-ollama.sh
+
+        ## 3. SIGedge contract and gateway
+        ./scripts/install-sigedge-gateway.sh
+
+        ## 4. Open WebUI and Caddy
+        if [ "$2" = "mycert" ]; then
+            SIGLIERE_HOSTNAME=sigliere.example.com \
+            SIGLIERE_CERT=/path/fullchain.pem \
+            SIGLIERE_KEY=/path/privkey.pem \
+            ./scripts/install-open-webui.sh
+        else
+            SIGLIERE_HOSTNAME=sigliere.example.local ./scripts/install-open-webui.sh
         fi
+
+        ### Isolated, DNS-less network (IP-only addressing):
+        SIGLIERE_HOSTNAME=$SIGLIERE_IPADDR ./scripts/install-open-webui.sh
+
+        ## 5. Firewall and validation
+        sudo ./scripts/install-security-hardening.sh
+        ./scripts/validate-security-hardening.sh
+        ./scripts/validate-tiered.sh
+
+        ## 6. Open WebUI tools
+        echo " "
+        echo -e "${SIGLIERE_BANNER_COLOR} ##"
+        echo -e "${SIGLIERE_BANNER_COLOR} ##  Follow openwebui-setup.md to install the native SIGedge"
+        echo -e "${SIGLIERE_BANNER_COLOR} ##  status and operator tools and configure their tokens."
+        echo -e "${SIGLIERE_BANNER_COLOR} ##"
+        echo -e "${SIGLIERE_BANNER_RESET}"
         ;;
 
     list )
@@ -185,55 +206,19 @@ case "$1" in
     install )
         source $SIGLIERE_PACKAGES/$SPKGSCRIPT install
         ;;
-
-    menu )
-        "$SIGLIERE_SCRIPTS/SIGliere_pkg_menu.py"
-        ;;
-
-    config )
-        source $SIGLIERE_SCRIPTS/$SCFGSCRIPT $3
-        ;;
-
+        
     update )
         SIGliere_update $3
-        ;;###
+        ;;
 
     upgrade)
         SIGliere_upgrade $3
         ;;
 
-    device )
-        case "$2" in
-            build )
-                source $SIGLIERE_DEVICES/$SPKGSCRIPT build
-                ;;
-
-            package )
-                source $SIGLIERE_DEVICES/$SPKGSCRIPT package
-                ;;
-
-            remove )
-                source $SIGLIERE_DEVICES/$SPKGSCRIPT remove
-                ;;
-
-            purge )
-                source $SIGLIERE_DEVICES/$SPKGSCRIPT purge
-                ;;
-
-            install )
-                source $SIGLIERE_DEVICES/$SPKGSCRIPT install
-                ;;
-        esac
-        ;;
-
-    shell )
-        source $2
-        ;;
-
     * )
         cat <<EOF
 
-       Usage:  SIGliere [ACTION] [TARGET|DEVICE]
+  Usage:  SIGliere [ACTION] [TARGET|DEVICE]
 
        ACTION
 
@@ -242,21 +227,15 @@ case "$1" in
           purge                  remove installed TARGET and purge configs
           build                  compile and install TARGET (option may not be available)
           package                compile only and copy packaged to SIG/debs directory (option may not be available)
-          menu                   Gtk Menu for SIGliere package management
           update                 check for TARGET updates
           upgrade                upgrade TARGET to latest release
 
-          setup
-                 standard        First time setup for desktop
-                 server          First time setup for server
-                 apps            Manage applications (install/remove)
+          setup                  First time setup
 
           list
                  packages        List all packages included with SIGliere
                  installed       List installed SIGliere packages
                  library         List all packages included with SIGliere with installed ones marked with an *
-
-          shell           provide SIGliere env variables around a TARGET
 
        TARGET
 

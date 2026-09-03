@@ -1,13 +1,13 @@
-# TIERED architecture
+# Architecture Model
+SIGliere is currently a scalable two-tiered architecture.
 
-## Ownership boundary
+- SIGedge owns the complete collection tier: hardware, SDR and protocol capture,
+DSP, ka9q-radio, OpenWebRX+, Kismet, calibration, recordings, and collection storage.
 
-SIGedge owns the complete collection tier: hardware, SDR and protocol capture,
-DSP, ka9q-radio, OpenWebRX+, Kismet, calibration, recordings, and collection
-storage. Sigliere owns model execution, user interaction, reasoning, and the
-small adapter needed to consume authorized SIGedge services.
+- SIGliere owns model execution, user interaction, reasoning, and the
+API service needed to consume authorized SIGedge services.
 
-The boundary is behavioral as well as organizational. Sigliere must not:
+The model is behavioral as well as organizational. SIGliere must not:
 
 - read SIGedge radiod configuration files;
 - invoke SIGedge systemd units;
@@ -15,7 +15,7 @@ The boundary is behavioral as well as organizational. Sigliere must not:
 - assume SIGedge is on the same host;
 - mount collection databases or capture directories into Open WebUI.
 
-## Network contract
+## Networking
 
 `gateway/config/nodes.json` version 1 declares logical node IDs, KA9Q status
 multicast addresses, frequency ranges, modes, and whether control is allowed.

@@ -1,7 +1,6 @@
 # Build details
 
-## Why host networking
-
+## Single-tier Host networking
 Open WebUI, Caddy, and the SIGedge gateway use host networking but their
 application listeners bind to loopback. This gives the gateway reliable KA9Q
 multicast access and lets Open WebUI reach Caddy's private routes without
@@ -11,23 +10,18 @@ Caddy is the exception: its HTTPS listener on port 8443 is intentionally
 LAN-facing. Its private listener on port 8180 is explicitly bound to
 `127.0.0.1`.
 
-## Why Caddy remains
-
-Caddy is not a plain port-forward in TIERED. It provides mandatory TLS for the
-user interface and becomes the single auditable ingress. It also gives local
-services stable private routes while Ollama and the gateway remain loopback
-only.
+## Caddy
+Caddy provides mandatory TLS for the user interface and becomes the single
+auditable ingress. It also gives local services stable private routes while
+Ollama and the gateway remain loopback only.
 
 `tls internal` uses Caddy's private CA. Clients must trust the exported root
 certificate. When a certificate and key are supplied at installation, Caddy
 uses those instead.
 
-## Why one gateway
-
-The former native/OpenAPI/MCP duplication has been removed. The retained
-gateway has one job: translate authenticated, logical SIGedge requests into
+## Gateway
+Gateway has one job: translate authenticated, logical SIGedge requests into
 KA9Q multicast operations. Open WebUI exposes those operations only through
-native tools.
-
-The gateway does not perform DSP and does not own collection persistence.
+native tools. The gateway does not perform DSP and does not own collection
+persistence.
 

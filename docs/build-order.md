@@ -56,6 +56,19 @@ SIGLIERE_KEY=/path/privkey.pem \
 
 The default is HTTPS on port 8443. There is no plain-HTTP LAN mode.
 
+Isolated, DNS-less network (IP-only addressing):
+
+```bash
+SIGLIERE_HOSTNAME=192.0.2.10 ./scripts/install-open-webui.sh
+```
+
+`SIGLIERE_HOSTNAME` may be the host's LAN IP address instead of a DNS or
+mDNS name. Caddy's internal CA issues the certificate with that IP as its
+Subject Alternative Name, so operators browse straight to
+`https://192.0.2.10:8443/` with no hosts-file entry or resolver required.
+Each client still needs to trust the internal CA once (or click through the
+browser warning) exactly as with a hostname deployment.
+
 ## 5. Firewall and validation
 
 ```bash

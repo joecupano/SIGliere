@@ -17,7 +17,16 @@ check() {
 }
 
 check "Open WebUI loopback" curl -fsS http://127.0.0.1:8080/
-check "Caddy TLS ingress" curl -ksS --resolve "${HOSTNAME_TLS}:8443:127.0.0.1"   "https://${HOSTNAME_TLS}:8443/"
+
+if [[ "${HOSTNAME_TLS}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  # An IP-literal host gets no SNI from real clients (RFC 6066); Caddy then
+  # matches by actual destination address, so probe that address directly
+  # rather than faking DNS to loopback.
+  check "Caddy TLS ingress" curl -ksS "https://${HOSTNAME_TLS}:8443/"
+else
+  check "Caddy TLS ingress" curl -ksS --resolve "${HOSTNAME_TLS}:8443:127.0.0.1"     "https://${HOSTNAME_TLS}:8443/"
+fi
+
 check "Ollama through private Caddy route" curl -fsS   http://127.0.0.1:8180/ollama/api/tags
 
 if [[ -r "${ENV_FILE}" ]]; then

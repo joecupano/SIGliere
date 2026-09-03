@@ -44,6 +44,7 @@ umask 077
   printf '\treverse_proxy 127.0.0.1:8080\n'
   printf '%s\n\n' '}'
   printf '%s\n' 'http://127.0.0.1:8180 {'
+  printf '\tbind 127.0.0.1\n'
   printf '\thandle_path /ollama/* {\n'
   printf '\t\treverse_proxy 127.0.0.1:11434\n'
   printf '\t}\n'
@@ -63,7 +64,15 @@ systemctl --user restart caddy.service
 
 ready=0
 for _ in $(seq 1 60); do
-  if curl -ksS --resolve "${HOSTNAME_TLS}:8443:127.0.0.1"       "https://${HOSTNAME_TLS}:8443/" >/dev/null 2>&1; then
+  if [[ "${HOSTNAME_TLS}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    # An IP-literal host gets no SNI from real clients (RFC 6066); Caddy
+    # then matches by actual destination address, so probe that address
+    # directly rather than faking DNS to loopback.
+    PROBE=(curl -ksS "https://${HOSTNAME_TLS}:8443/")
+  else
+    PROBE=(curl -ksS --resolve "${HOSTNAME_TLS}:8443:127.0.0.1" "https://${HOSTNAME_TLS}:8443/")
+  fi
+  if "${PROBE[@]}" >/dev/null 2>&1; then
     ready=1
     break
   fi

@@ -1,6 +1,6 @@
 # AI-tier data layout
 
-Sigliere stores only AI and optional reference data:
+SIGliere stores only AI and optional reference data:
 
 ```text
 /data/models                     Ollama model weights

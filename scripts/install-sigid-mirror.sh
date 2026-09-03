@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/install-sigid-mirror.sh
 #
-# Optional — SigID mirror. See docs/build-order.md Phase 6. Sets up
+# Optional — SigID mirror. See INSTALL.md Phase 6. Sets up
 # the /data/reference/sigid layout, ensures the reference venv
 # has `requests` (reference/sigid_mirror.py's only new dependency), and
 # installs a systemd --user timer for weekly incremental sync.

@@ -15,7 +15,7 @@ see manifest.py — safe to run repeatedly via the systemd timer
 (systemd/ai-ingest.timer) or by hand.
 
 Deliberately filesystem-only, not wired to Open WebUI/Ollama — see
-docs/build-order.md Phase 5 for why.
+INSTALL.md Phase 5 for why.
 
 Usage:
     python3 ingest.py                  # normal run

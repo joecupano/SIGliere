@@ -12,7 +12,7 @@ This installs rootless Podman, Python, TLS utilities, and basic host tools.
 It installs no collection or DSP packages.
 
 `install-corpus-dirs.sh` builds the whole `/data` corpus tree up front (see
-[data-layout.md](data-layout.md)) — not just the ai-ingest/reference-mirror
+[data-layout.md](docs/data-layout.md)) — not just the ai-ingest/reference-mirror
 directories used by the optional features in section 6. Every later step,
 including `install-ollama.sh`'s `/data/models`, assumes this tree already
 exists with the right ownership; running it here, before anything else
@@ -88,6 +88,6 @@ sudo ./scripts/install-security-hardening.sh
 
 ## 6. Open WebUI tools
 
-Follow [openwebui-setup.md](openwebui-setup.md) to install the native SIGedge
+Follow [openwebui-setup.md](docs/openwebui-setup.md) to install the native SIGedge
 status and operator tools and configure their tokens.
 

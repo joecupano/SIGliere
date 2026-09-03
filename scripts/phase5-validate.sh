@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/phase5-validate.sh
 #
-# Phase 5 exit criteria per docs/build-order.md: a document, an image,
+# Phase 5 exit criteria per INSTALL.md: a document, an image,
 # and a spoken-word audio clip each round-trip through ingest into
 # /data/corpus/processed — not just "the service is enabled."
 #

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/install-mac-mirror.sh
 #
-# Optional — MAC vendor (OUI/CID) database mirror. See docs/build-order.md
+# Optional — MAC vendor (OUI/CID) database mirror. See INSTALL.md
 # Phase 6. Sets up the /data/reference/mac-vendors layout and installs a
 # systemd --user timer for weekly re-sync. reference/mac_mirror.py's only
 # dependency is `requests`, already in the reference venv from

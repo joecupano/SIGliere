@@ -2,7 +2,7 @@
 
 Beyond the core SIGedge Status and Operator tools ([openwebui-setup.md](openwebui-setup.md)),
 `openwebui-tools/` ships three more native tools. All three are optional —
-none are required to complete [build-order.md](build-order.md) — and each
+none are required to complete [INSTALL.md](../INSTALL.md) — and each
 reads from a local mirror or local files only; nothing they do leaves the
 box.
 

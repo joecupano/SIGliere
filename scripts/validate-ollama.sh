@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/validate-ollama.sh
 #
-# Ollama install exit criteria per docs/build-order.md: ollama run works with
+# Ollama install exit criteria per INSTALL.md: ollama run works with
 # GPU utilization visible, and models are physically on /data/models —
 # not just "ollama pull exited 0."
 #

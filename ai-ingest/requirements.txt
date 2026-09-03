@@ -4,7 +4,7 @@
 # registry and conventions. Do not pip install these into system Python.
 #
 # This pipeline is filesystem-only, deliberately decoupled from Open
-# WebUI/Ollama (see docs/build-order.md Phase 5) — no API client
+# WebUI/Ollama (see INSTALL.md Phase 5) — no API client
 # dependency needed as a result.
 
 docling            # DOCX/PDF parsing and structure extraction, also

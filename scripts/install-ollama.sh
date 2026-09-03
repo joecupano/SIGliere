@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/install-ollama.sh
 #
-# Install — Ollama and default models. See docs/build-order.md for full
+# Install — Ollama and default models. See INSTALL.md for full
 # rationale. Installed natively (not containerized) for simpler GPU
 # passthrough.
 #

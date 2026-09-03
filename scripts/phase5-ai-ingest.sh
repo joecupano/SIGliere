@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/phase5-ai-ingest.sh
 #
-# Phase 5 — AI ingest pipeline. See docs/build-order.md for full
+# Phase 5 — AI ingest pipeline. See INSTALL.md for full
 # rationale. Sets up the ai-ingest venv (per docs/venvs.md) and deploys
 # the systemd --user timer that runs ingest.py on a schedule.
 #

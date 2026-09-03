@@ -15,6 +15,8 @@ See [docs/architecture.md](docs/architecture.md).
 ## Quick start
 
 Read [INSTALL.md](INSTALL.md).
+See the [documentation index](docs/README.md) for architecture, optional tools,
+data layout, security, and operations.
 
 If building a two-tiered deployment (separate hosts for SIGliere and SIGedge)
 configure SIGedge's multicast addresses and capabilities in `gateway/config/nodes.json`.
@@ -24,11 +26,15 @@ intended interface; `ttl=0` is host-local.
 ## Repository layout
 
 ```text
-gateway/             Versioned SIGedge contract, KA9Q client, gateway API
-openwebui-tools/      Native analyst and operator tools
-openwebui-prompts/    Model/system prompt configuration
-containers/           Rootless Podman Quadlets and Caddy policy
-scripts/              Core install, validation, and security scripts
-docs/                 Architecture and operator documentation
+ai-ingest/           Optional document, image, and audio ingest pipeline
+containers/          Rootless Podman Quadlets and Caddy policy
+docs/                Architecture and operator documentation
+gateway/             Versioned SIGedge contract, KA9Q client, and gateway API
+openwebui-prompts/    Model and system-prompt configuration
+openwebui-tools/      Native core and optional analysis tools
+reference/            Optional SigID and MAC-vendor mirrors
+scripts/              Installation, validation, and security scripts
+systemd/              User services and timers for optional capabilities
+tests/                Unit tests
 ```
 

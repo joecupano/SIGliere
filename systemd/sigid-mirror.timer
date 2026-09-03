@@ -1,5 +1,5 @@
 [Unit]
-Description=Run Sigliere SigID mirror sync weekly
+Description=Run SIGliere SigID mirror sync weekly
 
 [Timer]
 # Weekly, not hourly/daily like the AI ingest timer — SigID is a slow-

@@ -1,6 +1,6 @@
 """
 title: SIGINT SigID Reference
-author: sigliere
+author: SIGliere
 description: Look up signals in the local SigID (sigidwiki) reference mirror —
     by name, frequency, or characteristics. Native in-process Open WebUI tool,
     the optional reference source, giving the local LLM authoritative signal
@@ -15,7 +15,7 @@ license: AGPL-3.0
 #   sigid     = what signals ARE — the reference catalog to identify them
 #
 #   This mirrors the occupancy/kismet native-tool pattern, but the SigID data
-#   is NOT a single SQLite file. The Phase 6.3 mirror stores one JSON per wiki
+#   is NOT a single SQLite file. The SigID mirror stores one JSON per wiki
 #   page under /data/reference/sigid/metadata/<title>.json, each containing the
 #   page's MediaWiki `wikitext`. Real signal pages carry a structured infobox:
 #     {{Unidentified Signal |Frequencies=6115 kHz |Mode=AM |Modulation=8PSK

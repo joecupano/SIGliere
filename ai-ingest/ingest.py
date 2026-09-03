@@ -2,7 +2,7 @@
 """
 ai-ingest/ingest.py
 
-Phase 5 ingest orchestrator. Scans:
+AI ingest orchestrator. Scans:
   - /data/corpus/source  (documents: DOCX, PDF, TXT, MD)
   - /data/imagery         (images: PNG, JPG, HEIC, etc.)
   - /data/audio            (audio: WAV, MP3, etc.)
@@ -15,7 +15,7 @@ see manifest.py — safe to run repeatedly via the systemd timer
 (systemd/ai-ingest.timer) or by hand.
 
 Deliberately filesystem-only, not wired to Open WebUI/Ollama — see
-INSTALL.md Phase 5 for why.
+docs/rag-knowledge-base-guide.md for its relationship to chat RAG.
 
 Usage:
     python3 ingest.py                  # normal run
@@ -165,7 +165,7 @@ def run(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Sigliere AI ingest pipeline")
+    parser = argparse.ArgumentParser(description="SIGliere AI ingest pipeline")
     parser.add_argument("--dry-run", action="store_true", help="report only, don't process")
     parser.add_argument("--once", action="store_true", help="no-op flag for clarity in systemd unit")
     parser.add_argument("--corpus-source", type=Path, default=DEFAULT_CORPUS_SOURCE)

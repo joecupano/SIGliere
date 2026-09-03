@@ -1,104 +1,79 @@
 # Architecture Model
 
 ## Overview
-```
-                               LAN
-                                |
-                         HTTPS only :443
-                                |
-= = = = = = = = = = = SIGliere = = = = = = = = = = = = = = = = = = = = = =
-                                |
-                                v
-                    +------------------------+
-                    |         Caddy          |
-                    |   LAN-facing ingress   |
-                    |                        |
-                    | TLS termination        |
-                    | - Internal CA default  |
-                    | - Operator cert option |
-                    +-----------+------------+
-                                |
-                    loopback-only routing
-                         127.0.0.1 / ::1
-                                |
-              +-----------------+------------------+
-              |                                    |
-              v                                    v
-    +----------------------+             +----------------------+
-    |      Open WebUI      |             |  Caddy internal     |
-    |  Rootless Podman     |             |  loopback listener  |
-    |  Loopback bind only  |             |  not LAN accessible |
-    +----------+-----------+             +----------+-----------+
-               |                                    |
-               | Native Open WebUI tools only       |
-               |                                    |
-               +-------------------+----------------+
-                                   |
-                     +-------------+-------------+
-                     |                           |
-                     v                           |
-            +------------------+                 |
-            |      Ollama      |                 |
-            |   Host service   |                 |
-            | Loopback only    |                 |
-            +------------------+                 |
-                                                 |
-= = = = = = = = = = = SIGedge = = = = = = = = = = = = = = = = = = = = = =  
-                                                 |
-                                                 v                                               
-                                       +------------------------+
-                                       |    SIGedge Gateway     |
-                                       | Rootless Podman        |
-                                       | Host network           |
-                                       | Loopback bind only     |
-                                       +-----------+------------+
-                                                   |                                               |
-                                                   |
-                                             KA9Q multicast
-                                             discovery/control
-                                                   |
-                            +----------------------+----------------------+
-                            |                      |                      |
-                            v                      v                      v
-                    +---------------+      +---------------+      +---------------+
-                    | SIGedge Node  |      | SIGedge Node  |      | SIGedge Node  |
-                    |      A        |      |      B        |      |      N        |
-                    | logical node  |      | logical node  |      | logical node  |
-                    +---------------+      +---------------+      +---------------+
+```text
+                                  LAN browser
+                                       |
+                             HTTPS only, TCP 8443
+                                       |
+= = = = = = = = = = = = = = SIGliere = = = = = = = = = = = = = =
+                                       |
+                                       v
+                         +---------------------------+
+                         | Caddy TLS ingress         |
+                         | LAN-facing :8443          |
+                         | Internal CA or supplied   |
+                         | certificate and key       |
+                         +-------------+-------------+
+                                       |
+                              reverse proxy over
+                                  loopback
+                                       |
+                                       v
+                         +---------------------------+
+                         | Open WebUI                |
+                         | Rootless Podman           |
+                         | 127.0.0.1:8080            |
+                         +-------------+-------------+
+                                       |
+                              Open WebUI service traffic
+                                       |
+                                       v
+                         +---------------------------+
+                         | Caddy private router      |
+                         | 127.0.0.1:8180            |
+                         +-------------+-------------+
+                                       |
+                      +----------------+----------------+
+                      |                                 |
+             /ollama  v                       /gateway  v
+        +--------------------+              +----------------------+
+        | Ollama             |              | SIGedge gateway      |
+        | Host service       |              | Rootless Podman      |
+        | 127.0.0.1:11434    |              | 127.0.0.1:8140       |
+        +--------------------+              +----------+-----------+
+                                                      |
+                                           KA9Q multicast
+                                           status and control
+                                                      |
+= = = = = = = = = = = = = = SIGedge = = = = = = = = = = = = = =
+                                                      |
+                           +--------------------------+--------------------------+
+                           |                          |                          |
+                           v                          v                          v
+                  +----------------+         +----------------+         +----------------+
+                  | SIGedge node A |         | SIGedge node B |         | SIGedge node N |
+                  | collection/DSP |         | collection/DSP |         | collection/DSP |
+                  +----------------+         +----------------+         +----------------+
 
-Security / Integration Boundaries
----------------------------------
+Security and integration boundaries:
 
-LAN  --->  Caddy  --->  loopback services
-
-NO LAN DIRECT ACCESS TO:
-  - Open WebUI
-  - Ollama
-  - SIGedge Gateway
-  - Host APIs
-
-LLM INTEGRATION PATH:
-  LLM
-   |
-   v
-Open WebUI
-   |
-   +--> Native Open WebUI Tools --> Ollama
-   |
-   +--> Native Open WebUI Tools --> SIGedge Gateway
-
-There is NO parallel:
-  - OpenAPI query service
-  - MCP query service
+- Only Caddy TCP 8443 is reachable from the LAN.
+- Open WebUI, the private router, Ollama, and the gateway are loopback-only.
+- Open WebUI reaches Ollama through `/ollama`; native tools reach the gateway
+  through `/gateway`. Both use Caddy's loopback-only private router.
+- There is no parallel external OpenAPI or MCP query service.
 ```
 
-- SIGedge owns the complete collection tier: hardware, SDR and protocol capture,
-DSP, ka9q-radio, OpenWebRX+, Kismet, calibration, recordings, and collection storage.
+- SIGedge owns the complete collection tier: hardware, SDR and protocol
+  capture, DSP, ka9q-radio, OpenWebRX+, Kismet, calibration, recordings, and
+  collection storage.
 
 - SIGliere owns model execution, user interaction, reasoning, and the
-API service needed to consume authorized SIGedge services.
+  API service needed to consume authorized SIGedge services.
 
 The model is behavioral as well as organizational. SIGliere must not:
+
 - read SIGedge radiod configuration files;
 - invoke SIGedge systemd units;
 - contain receiver models, gain settings, or device profiles;
@@ -128,17 +103,21 @@ LAN browser
     |
     | HTTPS :8443
     v
-Caddy (host network)
-    |-- 127.0.0.1:8080  Open WebUI
+Caddy TLS ingress (host network)
     |
-    +-- 127.0.0.1:8180 private routes
-          |-- /ollama  -> 127.0.0.1:11434
-          +-- /gateway -> 127.0.0.1:8140
-
-SIGedge KA9Q multicast
-    |
-    v
-SIGedge gateway (host network)
+    +-- reverse proxy --> 127.0.0.1:8080  Open WebUI
+                                      |
+                                      +-- Ollama API --> Caddy 127.0.0.1:8180/ollama
+                                      |                   |
+                                      |                   +--> 127.0.0.1:11434  Ollama
+                                      |
+                                      +-- native tool --> Caddy 127.0.0.1:8180/gateway
+                                                          |
+                                                          +--> 127.0.0.1:8140  gateway
+                                                                    |
+                                                             KA9Q multicast
+                                                                    |
+                                                              SIGedge nodes
 ```
 
 Ports 8080, 8180, 11434, and 8140 are loopback-only. Port 8443 is the sole

@@ -1,5 +1,5 @@
 [Unit]
-Description=Sigliere TLS boundary and private service router
+Description=SIGliere TLS boundary and private service router
 After=network-online.target open-webui.service
 Wants=open-webui.service
 

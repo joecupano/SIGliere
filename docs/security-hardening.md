@@ -28,9 +28,12 @@ dry-run mode. The operator Open WebUI tool adds a live group-membership check.
 Do not expose port 8140 directly or register it as a shared external tool
 connection.
 
+See [operations.md](operations.md) for token rotation, production control,
+backup, and Caddy CA recovery.
+
 ## Multicast
 
 Treat the SIGedge multicast network as sensitive. Prefer a dedicated VLAN,
 enable IGMP snooping, limit TTL to the minimum required, and allow control
-multicast only from authorized Sigliere hosts.
+multicast only from authorized SIGliere hosts.
 

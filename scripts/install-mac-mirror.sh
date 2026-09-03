@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # scripts/install-mac-mirror.sh
 #
-# Optional — MAC vendor (OUI/CID) database mirror. See INSTALL.md
-# Phase 6. Sets up the /data/reference/mac-vendors layout and installs a
+# Optional MAC vendor (OUI/CID) database mirror.
+# Sets up the /data/reference/mac-vendors layout and installs a
 # systemd --user timer for weekly re-sync. reference/mac_mirror.py's only
 # dependency is `requests`, already in the reference venv from
-# Phase 6.3 (SigID mirror) — nothing new to install there.
+# the SigID mirror — nothing new to install there.
 #
 # Run as your normal user, NOT with sudo — same rootless pattern as
-# Phases 2/4/5/6.3.
+# the other rootless user services.
 #
 # This script sets up the SCHEDULE. It also runs one sync immediately so
 # there's real data to validate against — run
@@ -28,7 +28,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_PYTHON="${HOME}/.local/share/sigliere/venvs/reference/bin/python3"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
 
-echo "== Phase 6.8: MAC vendor database mirror =="
+echo "== MAC vendor database mirror =="
 
 if [[ ! -x "${VENV_PYTHON}" ]]; then
   echo "ERROR: expected venv interpreter not found at ${VENV_PYTHON}" >&2
@@ -88,7 +88,7 @@ cd "${REPO_ROOT}/reference"
 
 cat <<EOF
 
-== Phase 6.8 install complete ==
+== MAC vendor mirror install complete ==
 
 Timer installed: sync runs weekly (see systemd/mac-mirror.timer).
 Check status:     systemctl --user status mac-mirror.timer
@@ -96,9 +96,9 @@ Run manually any time: systemctl --user start mac-mirror.service
 View logs:         journalctl --user -u mac-mirror.service -f
 
 Next steps:
-  - Mount /data/reference/mac-vendors:/data/mac-vendors-ref:ro into Open
-    WebUI (containers/open-webui.container already has this) and install
-    openwebui-tools/mac_lookup_tool.py per docs/openwebui-setup.md.
+  - Add the read-only /data/reference/mac-vendors:/data/mac-vendors-ref mount
+    through an Open WebUI Quadlet drop-in and install
+    openwebui-tools/mac_lookup_tool.py per docs/optional-tools.md.
   - Run scripts/validate-mac-mirror.sh to confirm real content
     landed in /data/reference/mac-vendors.
 EOF

@@ -1,6 +1,6 @@
 """
 title: Whisper Transcription
-author: Sigliere
+author: SIGliere
 description: Transcribe or translate speech-bearing audio via faster-whisper,
     running locally on GPU. Native in-process Open WebUI tool — closes the
     "voice translation" cell of the SIGINT workflow map (Analysis stage).
@@ -11,11 +11,11 @@ requirements: faster-whisper>=1.0.0
 #
 # WHY THIS EXISTS (SIGINT workflow context):
 #   The Analysis stage of a SIGINT workflow includes "voice translation and
-#   pattern-of-life mapping." The Sigliere can optionally run
-#   faster-whisper on GPU in Phase 5 (ai-ingest, for /data/audio processed
-#   into /data/corpus/processed/audio/); this tool exposes the same capability
-#   to the local LLM at chat time, for ad-hoc transcription of a single audio
-#   file the operator specifies. Typical inputs:
+#   pattern-of-life mapping." The SIGliere host can run faster-whisper in the
+#   scheduled AI ingest pipeline, processing `/data/audio` into
+#   `/data/corpus/processed/audio/`. This tool exposes the same capability to
+#   the local LLM at chat time for ad-hoc transcription of a single audio file
+#   selected by the operator. Typical inputs:
 #     - Audio exported or shared by SIGedge
 #     - Broadcast/utility station recordings for transcription + translation
 #
@@ -30,15 +30,14 @@ requirements: faster-whisper>=1.0.0
 #   same fallback logic, different latency profile.
 #
 # DEPLOYMENT NOTES:
-#   1. Container mount: the audio files must be visible inside the Open WebUI
-#      container. Add to containers/open-webui.container (which the shipped
-#      template already does):
-#         Volume=%h/data/audio:/data/audio    (or wherever host audio lives)
-#      Then set AUDIO_ROOT valve to /data/audio (default).
+#   1. Container mount: add a Quadlet drop-in that mounts the host audio
+#      directory read-only; the core template intentionally has no audio mount:
+#         Volume=/data/audio:/data/audio:ro
+#      Then leave the AUDIO_ROOT valve at its /data/audio default.
 #
 #   2. Model cache: faster-whisper downloads the model to ~/.cache/huggingface
 #      on first use (a few hundred MB for the "medium" default). To reuse
-#      the phase5-downloaded cache and avoid a re-download, add to the
+#      the AI ingest cache and avoid a re-download, add to the
 #      Quadlet:
 #         Volume=%h/.cache/huggingface:/root/.cache/huggingface
 #      Optional: not required. First-run in-container download works fine
@@ -49,7 +48,7 @@ requirements: faster-whisper>=1.0.0
 #      libraries are available in the container. Falls back to CPU cleanly.
 #      Same load-and-retry pattern as ai-ingest/extractors/audio.py so this
 #      tool matches that service's behavior (verified end-to-end on the
-#      RTX 5060 Ti during phase5 spot-check).
+#      RTX 5060 Ti during AI ingest spot-check).
 #
 #   4. requirements: faster-whisper — Open WebUI reads the `requirements:`
 #      line in this file's docstring and pip-installs the package into the
@@ -120,7 +119,7 @@ class Tools:
             description="faster-whisper model size. Options: tiny, base, small, "
             "medium (default, ~1.5GB VRAM), large-v3. Must match a model in "
             "the HuggingFace cache OR downloadable at first use. Matches the "
-            "phase5 ai-ingest default for cache reuse.",
+            "AI ingest default for cache reuse.",
         )
         DEVICE: str = Field(
             default="auto",

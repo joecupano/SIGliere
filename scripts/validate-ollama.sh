@@ -43,7 +43,7 @@ echo
 # ---------------------------------------------------------------------
 echo "-- GPU inference (${INSTRUCT_MODEL}) --"
 if ! command -v ollama >/dev/null 2>&1; then
-  echo "  FAIL: ollama not found — run scripts/phase3-ollama.sh first"
+  echo "  FAIL: ollama not found — run scripts/install-ollama.sh first"
   RESULTS+=("GPU inference: FAIL (ollama not installed)")
 else
   RESPONSE_FILE="$(mktemp)"

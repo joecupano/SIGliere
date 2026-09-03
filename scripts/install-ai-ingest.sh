@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# scripts/phase5-ai-ingest.sh
+# scripts/install-ai-ingest.sh
 #
-# Phase 5 — AI ingest pipeline. See INSTALL.md for full
-# rationale. Sets up the ai-ingest venv (per docs/venvs.md) and deploys
-# the systemd --user timer that runs ingest.py on a schedule.
+# AI ingest pipeline. See docs/rag-knowledge-base-guide.md for its relationship
+# to chat RAG. Sets up the ai-ingest venv (per docs/venvs.md) and deploys the
+# systemd --user timer that runs ingest.py on a schedule.
 #
 # Run as your normal user, NOT with sudo — matches the rootless
-# Podman/systemd-user pattern established in Phases 2 and 4.
+# Podman and systemd user-service pattern used by this project.
 #
-# This script INSTALLS. Run scripts/phase5-validate.sh afterward.
+# This script INSTALLS. Run scripts/validate-ai-ingest.sh afterward.
 #
-# Usage: ./scripts/phase5-ai-ingest.sh
+# Usage: ./scripts/install-ai-ingest.sh
 
 set -euo pipefail
 
@@ -24,7 +24,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_PYTHON="${HOME}/.local/share/sigliere/venvs/ai-ingest/bin/python3"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
 
-echo "== Phase 5: AI ingest pipeline =="
+echo "== AI ingest pipeline =="
 
 # ---------------------------------------------------------------------
 # Venv (per docs/venvs.md conventions — reuses the existing setup-venvs.sh)
@@ -39,7 +39,7 @@ fi
 
 # tesseract-ocr is a system binary pytesseract shells out to — not a
 # pip package, so it doesn't belong in ai-ingest/requirements.txt.
-# Installing it here since Phase 5 is what actually needs it.
+# Install it here because the AI ingest pipeline requires it.
 echo "-- Installing tesseract-ocr (system binary pytesseract depends on) --"
 sudo apt install -y tesseract-ocr
 
@@ -71,13 +71,13 @@ systemctl --user enable --now ai-ingest.timer
 
 cat <<EOF
 
-== Phase 5 install complete ==
+== AI ingest install complete ==
 
 Timer installed: runs ingest.py every 4 hours (see systemd/ai-ingest.timer).
 Check status:    systemctl --user status ai-ingest.timer
 Run immediately:  systemctl --user start ai-ingest.service
 View logs:        journalctl --user -u ai-ingest.service -f
 
-Next: run scripts/phase5-validate.sh to confirm a real document, image,
+Next: run scripts/validate-ai-ingest.sh to confirm a real document, image,
 and audio file each round-trip through ingest into /data/corpus/processed.
 EOF

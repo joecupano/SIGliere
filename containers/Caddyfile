@@ -1,4 +1,4 @@
-# TLS-first ingress. phase4-open-webui.sh replaces the hostname when it
+# TLS-first ingress. install-open-webui.sh replaces the hostname when it
 # installs this file. Caddy's internal CA is the default; an operator may
 # provide an existing certificate and key during installation instead.
 {

@@ -1,5 +1,5 @@
 [Unit]
-Description=Open WebUI (Sigliere)
+Description=Open WebUI (SIGliere)
 After=network-online.target
 
 [Container]
@@ -15,12 +15,8 @@ Network=host
 Environment=HOST=127.0.0.1
 Environment=PORT=8080
 
-# App state (webui.db, vector_db/, cache/) — everything EXCEPT uploaded
-# RAG documents — lives in a Podman-managed named volume, not /data.
-# This is deliberately separate from the /data/rag bind mount below:
-# app state isn't "static documents for RAG" in the sense docs/data-
-# layout.md means, and letting Podman manage it avoids fighting Open
-# WebUI's internal directory layout on a host path.
+# Open WebUI state, including its database, uploads, vector store, and cache,
+# lives in a Podman-managed volume. Collection data remains outside this volume.
 Volume=open-webui-state:/app/backend/data
 
 # Collection databases and captures belong to SIGedge and are deliberately

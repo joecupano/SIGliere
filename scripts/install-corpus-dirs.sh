@@ -4,7 +4,7 @@
 # Foundational — builds the whole /data corpus tree (see
 # docs/data-layout.md) up front, before Ollama or any optional
 # ai-ingest/reference-mirror feature runs. Every current and future
-# consumer of that tree (install-ollama.sh's /data/models, phase5-ai-ingest.sh,
+# consumer of that tree (install-ollama.sh's /data/models, install-ai-ingest.sh,
 # install-mac-mirror.sh, install-sigid-mirror.sh) assumes this has already
 # run — creating it here, once, keeps that assumption true instead of
 # leaving each consumer to create its own piece ad hoc with inconsistent

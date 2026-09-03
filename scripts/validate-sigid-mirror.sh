@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/validate-sigid-mirror.sh
 #
-# Phase 6.3 exit criteria: real content mirrored, AND a second run
+# SigID mirror exit criteria: real content mirrored, AND a second run
 # demonstrably does incremental sync (near-instant, near-zero new
 # pages) rather than re-fetching everything — that's the actual point
 # of this being reusable/periodic, not just "it ran once."
@@ -16,7 +16,7 @@ OUTPUT_ROOT="/data/reference/sigid"
 
 RESULTS=()
 
-echo "== Phase 6.3 validation: SigID mirror =="
+echo "== SigID mirror validation =="
 echo
 
 if [[ ! -x "${VENV_PYTHON}" ]]; then
@@ -109,8 +109,8 @@ done
 echo
 
 if [[ "${FAILED}" -eq 1 ]]; then
-  echo "Phase 6.3 NOT complete — resolve failures above."
+  echo "SigID mirror validation failed — resolve failures above."
   exit 1
 else
-  echo "Phase 6.3 exit criteria met."
+  echo "SigID mirror exit criteria met."
 fi

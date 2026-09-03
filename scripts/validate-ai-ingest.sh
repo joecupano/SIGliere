@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# scripts/phase5-validate.sh
+# scripts/validate-ai-ingest.sh
 #
-# Phase 5 exit criteria per INSTALL.md: a document, an image,
+# AI ingest exit criteria: a document, an image,
 # and a spoken-word audio clip each round-trip through ingest into
 # /data/corpus/processed — not just "the service is enabled."
 #
@@ -16,14 +16,14 @@
 # value. Not covered here — test that case manually with a real scanned
 # PDF once one's available, per the note at the end of this script.
 #
-# Usage: ./scripts/phase5-validate.sh
+# Usage: ./scripts/validate-ai-ingest.sh
 
 set -uo pipefail
 
 VENV_PYTHON="${HOME}/.local/share/sigliere/venvs/ai-ingest/bin/python3"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-STAGE_NAME="_phase5_validate"
+STAGE_NAME="_ai_ingest_validate"
 SOURCE_STAGE="/data/corpus/source/${STAGE_NAME}"
 IMAGERY_STAGE="/data/imagery/${STAGE_NAME}"
 AUDIO_STAGE="/data/audio/${STAGE_NAME}"
@@ -39,7 +39,7 @@ cleanup() {
   rm -rf "${SOURCE_STAGE}" "${IMAGERY_STAGE}" "${AUDIO_STAGE}" "${PROCESSED_STAGES[@]}"
   # Python's sqlite3 module, not the separate `sqlite3` CLI binary —
   # confirmed via a real run that the CLI was never installed by any
-  # phase script, which silently no-op'd this cleanup (2>/dev/null ||
+  # installer, which silently no-op'd this cleanup (2>/dev/null ||
   # true masked the "command not found" failure) and left stale
   # manifest rows that caused later runs to wrongly skip reprocessing.
   # ingest.py's own needs_processing() check is now also independently
@@ -56,11 +56,11 @@ conn.close()
 }
 trap cleanup EXIT
 
-echo "== Phase 5 validation =="
+echo "== AI ingest validation =="
 echo
 
 if [[ ! -x "${VENV_PYTHON}" ]]; then
-  echo "FAIL: ai-ingest venv not found at ${VENV_PYTHON} — run scripts/phase5-ai-ingest.sh first"
+  echo "FAIL: ai-ingest venv not found at ${VENV_PYTHON} — run scripts/install-ai-ingest.sh first"
   exit 1
 fi
 
@@ -74,7 +74,7 @@ echo "-- Generating synthetic test files --"
 "${VENV_PYTHON}" - <<PYEOF
 from docx import Document
 d = Document()
-d.add_paragraph("sovereign sigint phase five validation document")
+d.add_paragraph("sovereign sigint AI ingest validation document")
 d.save("${SOURCE_STAGE}/test.docx")
 
 from PIL import Image, ImageDraw, ImageFont
@@ -90,13 +90,13 @@ img.save("${IMAGERY_STAGE}/test.png")
 PYEOF
 
 if command -v espeak-ng >/dev/null 2>&1; then
-  espeak-ng -w "${AUDIO_STAGE}/test.wav" "sovereign sigint phase five validation audio" 2>/dev/null
+  espeak-ng -w "${AUDIO_STAGE}/test.wav" "sovereign sigint AI ingest validation audio" 2>/dev/null
   AUDIO_AVAILABLE=true
 else
   echo "  espeak-ng not found — installing (validation-only dependency, not needed in production)"
   sudo apt install -y espeak-ng >/dev/null 2>&1
   if command -v espeak-ng >/dev/null 2>&1; then
-    espeak-ng -w "${AUDIO_STAGE}/test.wav" "sovereign sigint phase five validation audio" 2>/dev/null
+    espeak-ng -w "${AUDIO_STAGE}/test.wav" "sovereign sigint AI ingest validation audio" 2>/dev/null
     AUDIO_AVAILABLE=true
   else
     echo "  Could not install espeak-ng — skipping audio round-trip test"
@@ -165,8 +165,8 @@ done
 echo
 
 if [[ "${FAILED}" -eq 1 ]]; then
-  echo "Phase 5 NOT complete — resolve failures above."
+  echo "AI ingest validation failed — resolve failures above."
   exit 1
 else
-  echo "Phase 5 exit criteria met for document/image/audio (see PDF note above)."
+  echo "AI ingest exit criteria met for document/image/audio (see PDF note above)."
 fi

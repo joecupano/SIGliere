@@ -2,7 +2,7 @@
 """
 reference/sigid_mirror.py
 
-Phase 6.3 — sovereign mirror of sigidwiki.com's signal identification
+SigID mirror — sovereign mirror of sigidwiki.com's signal identification
 catalog. Designed to be run repeatedly (manually or via
 systemd/sigid-mirror.timer) and only fetch what's new or changed since
 the last successful run — not a one-shot dump.
@@ -58,8 +58,8 @@ BASE_URL = "https://www.sigidwiki.com"
 API_DISCOVERY_PATHS = ["/api.php", "/w/api.php"]  # try both, cache whichever works
 
 USER_AGENT = (
-    "Sigliere-mirror/1.0 "
-    "(https://github.com/joecupano/Sigliere; personal SIGINT reference mirror)"
+    "SIGliere-mirror/1.0 "
+    "(https://github.com/joecupano/SIGliere; personal SIGINT reference mirror)"
 )
 REQUEST_DELAY_SECONDS = 1.5  # rate limit between requests — be a good citizen
 REQUEST_TIMEOUT = 30
@@ -370,7 +370,7 @@ def run(output_root: Path, dry_run: bool, full_resync: bool) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Sigliere SigID mirror")
+    parser = argparse.ArgumentParser(description="SIGliere SigID mirror")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--once", action="store_true", help="no-op flag for clarity in systemd unit")
     parser.add_argument("--full-resync", action="store_true",

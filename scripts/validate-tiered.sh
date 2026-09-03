@@ -45,5 +45,5 @@ if (( failures )); then
   echo "${failures} validation check(s) failed." >&2
   exit 1
 fi
-echo "TIERED core validation passed."
+echo "Tiered core validation passed."
 

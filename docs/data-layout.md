@@ -4,7 +4,7 @@ SIGliere stores only AI and optional reference data:
 
 ```text
 /data/models                     Ollama model weights
-/data/corpus/source              optional AI-ingest inputs
+/data/corpus/source              optional AI ingest inputs
 /data/corpus/processed           optional normalized text
 /data/reference/sigid            optional SigID mirror
 /data/reference/mac-vendors      optional MAC vendor mirror

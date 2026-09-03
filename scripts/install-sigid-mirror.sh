@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # scripts/install-sigid-mirror.sh
 #
-# Optional — SigID mirror. See INSTALL.md Phase 6. Sets up
+# Optional SigID mirror. Sets up
 # the /data/reference/sigid layout, ensures the reference venv
 # has `requests` (reference/sigid_mirror.py's only new dependency), and
 # installs a systemd --user timer for weekly incremental sync.
 #
 # Run as your normal user, NOT with sudo — same rootless pattern as
-# Phases 2/4/5.
+# other rootless user services.
 #
 # This script sets up the SCHEDULE. It also runs one sync immediately
 # so there's real data to validate against — run
@@ -27,7 +27,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_PYTHON="${HOME}/.local/share/sigliere/venvs/reference/bin/python3"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
 
-echo "== Phase 6.3: SigID mirror =="
+echo "== SigID mirror =="
 
 # ---------------------------------------------------------------------
 # The optional reference venv is kept separate from the gateway image.
@@ -82,7 +82,7 @@ cd "${REPO_ROOT}/reference"
 
 cat <<EOF
 
-== Phase 6.3 install complete ==
+== SigID mirror install complete ==
 
 Timer installed: incremental sync runs weekly (see systemd/sigid-mirror.timer).
 Check status:     systemctl --user status sigid-mirror.timer

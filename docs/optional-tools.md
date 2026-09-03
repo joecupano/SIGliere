@@ -3,13 +3,13 @@
 Beyond the core SIGedge Status and Operator tools ([openwebui-setup.md](openwebui-setup.md)),
 `openwebui-tools/` ships three more native tools. All three are optional —
 none are required to complete [INSTALL.md](../INSTALL.md) — and each
-reads from a local mirror or local files only; nothing they do leaves the
-box.
+uses local mirrors or files at runtime; tool calls do not leave the
+host. Initial mirror and model downloads still require network access.
 
 | Tool | File | Needs |
 |---|---|---|
-| MAC Vendor Lookup | `mac_lookup_tool.py` | `/data/reference/mac-vendors` mirror (Phase 6.8) |
-| SigID Reference | `sigid_reference_tool.py` | `/data/reference/sigid` mirror (Phase 6.3) |
+| MAC Vendor Lookup | `mac_lookup_tool.py` | `/data/reference/mac-vendors` mirror |
+| SigID Reference | `sigid_reference_tool.py` | `/data/reference/sigid` mirror |
 | Whisper Transcription | `sigint_whisper_tool.py` | `/data/audio` (already created by `install-corpus-dirs.sh`) |
 
 ## Mount the data in first
@@ -18,8 +18,7 @@ Each tool runs inside the Open WebUI container and only reads what's
 mounted into it. `containers/open-webui.container` doesn't mount any of
 these paths by default, and `install-open-webui.sh` overwrites that file on
 every re-run — so add the mounts as a Quadlet drop-in rather than editing
-the installed file directly, per
-[openwebui-setup-details.md](openwebui-setup-details.md#L16-18):
+the installed file directly:
 
 ```bash
 mkdir -p ~/.config/containers/systemd/open-webui.container.d
@@ -44,9 +43,9 @@ name) from a local mirror of the IEEE OUI/CID registry — useful for
 naming devices Kismet has already seen. Never queries an external
 lookup API.
 
-1. Run `./scripts/install-mac-mirror.sh` (not `sudo` — rootless, same as
-   the other Phase 6 scripts) to populate `/data/reference/mac-vendors`
-   and install a weekly `systemd --user` refresh timer. Validate with
+1. Run `./scripts/install-mac-mirror.sh` (not `sudo` — it installs a user
+   service) to populate `/data/reference/mac-vendors` and install a weekly
+   `systemd --user` refresh timer. Validate with
    `./scripts/validate-mac-mirror.sh`.
 2. Add the `mac-vendors` `Volume=` line from above and restart Open WebUI.
 3. In Open WebUI, **Workspace → Tools → Create a new tool**, paste
@@ -77,11 +76,11 @@ signal is*, separate from your own capture/observation data.
 
 ## Whisper Transcription
 
-On-demand speech-to-text (or translation to English) for a single audio
-file, via `faster-whisper` on GPU — the chat-time counterpart to Phase
-5's bulk/background audio ingest. Same model and GPU fallback logic as
-`ai-ingest/extractors/audio.py`, different latency profile: this runs
-immediately when asked, rather than on `ai-ingest.timer`'s schedule.
+On-demand speech-to-text or English translation for a single audio file via
+`faster-whisper`. It is the chat-time counterpart to the scheduled bulk audio
+ingest pipeline and uses the same model and GPU fallback logic as
+`ai-ingest/extractors/audio.py`. Unlike the scheduled pipeline, this tool runs
+immediately when asked.
 
 1. No mirror step — `/data/audio` already exists from
    `scripts/install-corpus-dirs.sh`. Just place audio files there (`.wav`,
@@ -97,7 +96,7 @@ immediately when asked, rather than on `ai-ingest.timer`'s schedule.
 4. Leave `AUDIO_ROOT` at its default (`/data/audio`) — it matches the
    mount target above. `MODEL_SIZE` defaults to `medium`; `DEVICE`
    defaults to `auto` (GPU with a clean CPU fallback).
-5. Optional: to reuse Phase 5's already-downloaded model weights instead
+5. Optional: to reuse the AI ingest pipeline's downloaded model weights instead
    of a fresh in-container download, add
    `Volume=%h/.cache/huggingface:/root/.cache/huggingface` to the same
    drop-in file.

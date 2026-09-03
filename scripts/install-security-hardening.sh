@@ -11,7 +11,7 @@ apt install -y ufw unattended-upgrades fail2ban
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow OpenSSH
-ufw allow 8443/tcp comment 'Sigliere Caddy TLS ingress'
+ufw allow 8443/tcp comment 'SIGliere Caddy TLS ingress'
 ufw --force enable
 
 echo "Only SSH and Caddy HTTPS are allowed inbound."

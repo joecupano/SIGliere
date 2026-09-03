@@ -1,7 +1,7 @@
 # Open WebUI setup
 Open WebUI is available at `https://<hostname-ip>:8443/`.
 
-# Deployment details
+## Deployment details
 The core container has one persistent mount:
 `open-webui-state:/app/backend/data`. Collection databases, Kismet files,
 audio captures, and SDR data are not mounted because SIGedge owns them.
@@ -42,29 +42,36 @@ Read the generated tokens from `~/.config/sigliere/gateway.env`:
 - Leave `GATEWAY_BASE_URL` at
   `http://127.0.0.1:8180/gateway`.
 
-The operator tool rechecks the caller's Open WebUI `Operator` group
-membership on every call. Administrators are allowed by default; disable
-`ALLOW_ADMIN_ROLE` to require group membership for administrators too.
+Create an `Operator` group in Open WebUI and add only authorized users. The
+operator tool checks that group on every call. Administrators are allowed by
+default; disable `ALLOW_ADMIN_ROLE` to require group membership for them too.
+The configured group name must match the tool's `OPERATOR_GROUP_NAME` valve.
 
-Create a new model (Workspace > Models) from **qwen3:14B** or **llama3-groq-tool-use:8b**
-Attach both tools to the new model. Test in this order in a chat
-with the new model you have assigned the tools to:
+Create a custom model from `qwen3:14b` or `llama3-groq-tool-use:8b` under
+**Workspace → Models**, then attach both tools. Apply the
+[SIGINT analyst system prompt](../openwebui-prompts/SIGINT-analyst.system-prompt.md)
+to keep the tier boundary explicit.
 
-1. call `list_sigedge_nodes`;
-2. call `sigedge_status`;
-3. call the operator tool's `list_sigedge_nodes`;
-4. request a tune while the gateway is still in dry-run mode.
+Test the model in this order:
 
-Only change `SIGLIERE_GATEWAY_DRY_RUN=false` after live multicast status and
-authorization have both been verified.
+1. Call `list_sigedge_nodes` with the status tool.
+2. Call `sigedge_status`.
+3. Call `list_sigedge_nodes` with the operator tool.
+4. Request a tune while the gateway is still in dry-run mode.
 
-## Optional SIGINT Analyst tools
+Keep `SIGLIERE_GATEWAY_DRY_RUN=true` until live multicast status and
+authorization have both been verified. Follow the
+[operations guide](operations.md#enable-or-disable-live-gateway-control) for
+the production transition and rollback procedure.
 
-Three tools are available to support SIGINT Analyst investigations:
-- MAC vendor lookup (local mirror MAC vendor (OUI/CID) database.)
-- SIGid signal reference (local mirrof of SIGidWiki.)
+## Optional SIGINT analyst tools
+
+Three optional tools support analyst investigations:
+
+- MAC-vendor lookup using a local IEEE OUI/CID mirror.
+- SigID signal lookup using a local sigidwiki mirror.
 - On-demand Whisper transcription.
 
-These are available but not required for a core install.
-See [optional-tools.md](optional-tools.md).
+See [optional-tools.md](optional-tools.md) for installation and read-only mount
+instructions.
 

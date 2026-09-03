@@ -1,5 +1,5 @@
 [Unit]
-Description=Sigliere gateway to SIGedge KA9Q multicast services
+Description=SIGliere gateway to SIGedge KA9Q multicast services
 After=network-online.target
 Wants=network-online.target
 

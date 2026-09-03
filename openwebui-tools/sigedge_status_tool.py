@@ -1,6 +1,6 @@
 """
 title: SIGedge Status
-author: Sigliere
+author: SIGliere
 description: Read configured SIGedge nodes and their live KA9Q multicast status.
 version: 1.0.0
 license: AGPL-3.0

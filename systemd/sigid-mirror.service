@@ -1,5 +1,5 @@
 [Unit]
-Description=Sigliere SigID mirror sync (Phase 6.3)
+Description=SIGliere SigID mirror sync
 
 [Service]
 Type=oneshot

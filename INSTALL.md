@@ -1,4 +1,4 @@
-# Build order
+# Installation
 
 ## 1. Host prerequisites
 
@@ -13,8 +13,8 @@ It installs no collection or DSP packages.
 
 `install-corpus-dirs.sh` builds the whole `/data` corpus tree up front (see
 [data-layout.md](docs/data-layout.md)) — not just the ai-ingest/reference-mirror
-directories used by the optional features in section 6. Every later step,
-including `install-ollama.sh`'s `/data/models`, assumes this tree already
+directories used by the optional capabilities described in section 7. Every
+later step, including `install-ollama.sh`'s `/data/models`, assumes this tree
 exists with the right ownership; running it here, before anything else
 touches `/data`, keeps that assumption true instead of leaving it to
 whichever script happens to touch `/data` first.
@@ -91,3 +91,33 @@ sudo ./scripts/install-security-hardening.sh
 Follow [openwebui-setup.md](docs/openwebui-setup.md) to install the native SIGedge
 status and operator tools and configure their tokens.
 
+## 7. Optional local capabilities
+
+These components are not required for the core gateway and Open WebUI
+deployment.
+
+Install and validate scheduled document, image, and audio ingest:
+
+```bash
+./scripts/install-ai-ingest.sh
+./scripts/validate-ai-ingest.sh
+```
+
+Install the local reference mirrors. Initial syncs require internet access:
+
+```bash
+./scripts/install-sigid-mirror.sh
+./scripts/validate-sigid-mirror.sh
+./scripts/install-mac-mirror.sh
+./scripts/validate-mac-mirror.sh
+```
+
+Follow [optional-tools.md](docs/optional-tools.md) to add only the read-only
+Open WebUI mounts and native tools that the deployment needs. For chat RAG,
+follow [rag-knowledge-base-guide.md](docs/rag-knowledge-base-guide.md); the
+standalone AI ingest output is not indexed by Open WebUI automatically.
+
+## 8. Operations
+
+Before enabling live gateway control, rotating tokens, backing up state, or
+upgrading services, read [operations.md](docs/operations.md).

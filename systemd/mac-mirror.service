@@ -1,5 +1,5 @@
 [Unit]
-Description=Sigliere MAC vendor database mirror sync (Phase 6.8)
+Description=SIGliere MAC vendor database mirror sync
 
 [Service]
 Type=oneshot

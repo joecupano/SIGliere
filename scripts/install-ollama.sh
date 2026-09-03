@@ -22,16 +22,15 @@ echo "== Install: Ollama and default models =="
 # ---------------------------------------------------------------------
 INSTRUCT_MODEL="${INSTRUCT_MODEL:-qwen3:14b}"     # general chat/reasoning,
                                                     # NL query over SIGINT DB
-EMBED_MODEL="${EMBED_MODEL:-nomic-embed-text}"    # RAG over /data/rag —
+EMBED_MODEL="${EMBED_MODEL:-nomic-embed-text}"    # embeddings for Open WebUI Knowledge —
                                                     # the standard pick,
                                                     # ~274MB, 8192-token chunks
 VISION_MODEL="${VISION_MODEL:-gemma3:12b}"        # image reasoning over
                                                     # /data/imagery; also
                                                     # handles OCR-adjacent
                                                     # tasks reasonably, though
-                                                    # the ai-ingest pipeline's
-                                                    # docling/pytesseract path
-                                                    # (Phase 5) remains the
+                                                    # the ai-ingest pipeline uses
+                                                    # docling/pytesseract as its
                                                     # primary OCR mechanism
 TOOL_MODEL="${TOOL_MODEL:-llama3-groq-tool-use:8b}" # dedicated tool/function-
                                                     # calling model (~4.7GB),

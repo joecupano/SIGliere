@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 SUPPORTED_EXTENSIONS = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".opus"}
 
 # "medium" — ~1.5GB VRAM, confirmed fit on the 16GB RTX 5060 Ti alongside
-# the Phase 3 Ollama models (see INSTALL.md Phase 3). Override
+# the default Ollama models. Override
 # via WHISPER_MODEL if a different size/accuracy tradeoff is wanted.
 DEFAULT_MODEL_SIZE = os.environ.get("WHISPER_MODEL", "medium")
 

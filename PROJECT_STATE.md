@@ -75,26 +75,23 @@ particular host has been installed or has passed live multicast validation.
 
 - Repository checks cannot replace live validation against the target SIGedge
   network and KA9Q services.
-- The standalone AI-ingest output is not automatically indexed by Open WebUI;
+- The standalone AI ingest output is not automatically indexed by Open WebUI;
   chat RAG currently uses Open WebUI's separate Knowledge feature.
 - Automated ingest validation covers DOCX, image OCR, and spoken audio. A real
   scanned PDF still requires a manual test.
 - Unit coverage is currently narrow: gateway client contract behavior and a
   SigID manifest fallback. Service, authorization, multicast, and container
   integration are covered by deployment validators rather than unit tests.
-- Documentation cleanup remains: `docs/optional-tools.md` links to the removed
-  `openwebui-setup-details.md`; several guides and source comments retain legacy
-  phase numbers that are no longer defined in `INSTALL.md`; and the architecture
-  overview diagram labels ingress as 443 instead of 8443.
 
 ## Verification baseline
 
-Against commit `681f1b1` on 2026-09-03:
+Verification performed on 2026-09-03:
 
 - `python3 -m unittest discover -s tests -v`: 4 tests passed.
 - Python compilation completed for `ai-ingest/`, `gateway/src/`,
   `openwebui-tools/`, `reference/`, and `tests/`.
 - `bash -n scripts/*.sh` completed successfully.
+- All relative Markdown links resolve.
 
 No live host, container, GPU, Open WebUI, Ollama, or SIGedge multicast tests
 were run as part of this documentation update.

@@ -1,6 +1,6 @@
 """
 title: MAC Vendor Lookup
-author: sigliere
+author: SIGliere
 description: Identify the manufacturer behind a MAC address (or search vendors
     by name) using the local sovereign mirror of maclookup.app's OUI/CID
     database — no MAC address or vendor query ever leaves this box. Native

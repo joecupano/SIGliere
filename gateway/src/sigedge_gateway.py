@@ -64,7 +64,7 @@ class GatewayState:
 
 state = GatewayState()
 app = FastAPI(
-    title="Sigliere SIGedge Gateway",
+    title="SIGliere SIGedge Gateway",
     version="1.0.0",
     description="Authenticated AI-tier access to SIGedge KA9Q multicast services.",
 )

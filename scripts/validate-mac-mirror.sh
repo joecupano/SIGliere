@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/validate-mac-mirror.sh
 #
-# Phase 6.8 exit criteria: real database content mirrored locally, the
+# MAC vendor mirror exit criteria: real database content mirrored locally, the
 # content looks like a real MAC vendor database (not an empty/broken
 # download), and the timer is actually scheduled.
 #
@@ -16,7 +16,7 @@ DATA_FILE="${OUTPUT_ROOT}/mac-vendors.json"
 
 RESULTS=()
 
-echo "== Phase 6.8 validation: MAC vendor database mirror =="
+echo "== MAC vendor mirror validation =="
 echo
 
 if [[ ! -x "${VENV_PYTHON}" ]]; then
@@ -113,8 +113,8 @@ done
 echo
 
 if [[ "${FAILED}" -eq 1 ]]; then
-  echo "Phase 6.8 NOT complete — resolve failures above."
+  echo "MAC vendor mirror validation failed — resolve failures above."
   exit 1
 else
-  echo "Phase 6.8 exit criteria met."
+  echo "MAC vendor mirror exit criteria met."
 fi

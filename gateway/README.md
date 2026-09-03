@@ -1,6 +1,6 @@
 # SIGedge gateway
 
-The gateway is Sigliere's only runtime adapter to the collection tier. It
+The gateway is SIGliere's only runtime adapter to the collection tier. It
 uses `ka9q-python` against explicit KA9Q status multicast addresses and has
 no knowledge of SDR hardware, radiod configuration files, SIGedge service
 names, or SIGedge filesystem paths.
@@ -15,5 +15,5 @@ Operator tokens can request tuning when both the node and gateway permit it.
 The gateway installs in dry-run mode by default.
 
 SIGedge must publish its status and channel multicast with a TTL that reaches
-the Sigliere host. `ttl=0` is host-local and cannot support a remote tier.
+the SIGliere host. `ttl=0` is host-local and cannot support a remote tier.
 

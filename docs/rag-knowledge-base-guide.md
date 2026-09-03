@@ -35,18 +35,16 @@ any public-facing or commercial system.
 
 ## Architecture Note: Two Ingest Paths, and Why We're Using One Specifically
 
-This build already has a document ingest pipeline (Phase 5,
-`ai-ingest/`, see `scripts/phase5-ai-ingest.sh`) — but it's deliberately
-**decoupled from Open WebUI's own chat RAG**, by design. Phase 5's
+This build already has a standalone document ingest pipeline
+(`ai-ingest/`; see `scripts/install-ai-ingest.sh`) — but it's deliberately
+**decoupled from Open WebUI's own chat RAG**, by design. AI ingest's
 output lands in `/data/corpus/processed` as a standalone corpus; nothing
 currently wires it into a chat-queryable retrieval layer.
 
-For an actual chat session that retrieves from this material, the
-correct tool is **Open WebUI's own native Knowledge feature** — its own
-embedding (via `nomic-embed-text`, already configured in Phase 3) and
-its own retrieval, already wired into chat. That's the path this guide
-uses. If you also want this material in Phase 5's separate corpus for
-other reasons, that's an independent, optional step — not required for
+For a chat session that retrieves from this material, use **Open WebUI native
+Knowledge**. It provides embedding through `nomic-embed-text` and retrieval
+already wired into chat. If you also want this material in the standalone
+pipeline corpus, that is an independent, optional step and is not required for
 the chat session below.
 
 ## Step 1: Get the Source Material
@@ -65,7 +63,7 @@ files, and this repo has been maintained for a while.
 Open WebUI's document upload works best with clean text/markdown, not
 raw HTML with 1990s-era markup (the source material itself notes much
 of it predates modern HTML standards). Rather than introduce a new
-dependency, this reuses **Docling — already installed in Phase 5's
+dependency, this reuses **Docling — already installed in the AI ingest
 `ai-ingest` venv** — the same conversion engine this build already
 relies on elsewhere, applied here as a one-off preprocessing pass
 rather than through the full `ingest.py` pipeline.
@@ -75,7 +73,7 @@ Save this as `~/rag-demo/convert.py`:
 ```python
 #!/usr/bin/env python3
 """One-off HTML -> Markdown conversion for RAG prep, using Docling
-directly (not the full Phase 5 ingest.py pipeline — this is a
+directly (not the full `ingest.py` pipeline — this is a
 standalone preprocessing step feeding Open WebUI's Knowledge feature,
 not this project's own /data/corpus)."""
 
@@ -118,7 +116,7 @@ if __name__ == "__main__":
     main()
 ```
 
-Run it with the Phase 5 venv's Python — no separate install needed:
+Run it with the AI ingest environment's Python — no separate install needed:
 
 ```
 ${HOME}/.local/share/sigliere/venvs/ai-ingest/bin/python3 ~/rag-demo/convert.py
@@ -140,7 +138,7 @@ Log into Open WebUI and:
 2. **Upload the converted files** — the `.md` files from
    `~/rag-demo/converted`. Open WebUI will chunk and embed each one
    using whatever embedding model is configured in Admin Settings →
-   Documents (should already be `nomic-embed-text`, set back in Phase 3/4
+   Documents (should be `nomic-embed-text`; confirm it here
    — worth confirming rather than assuming it stuck).
 3. Wait for indexing to complete — with hundreds of files, this takes
    real time. Open WebUI shows per-file processing status; let it finish
@@ -204,7 +202,7 @@ happening, not just Ollama answering from general training data anyway.
   structure-aware parsing handles most of it well, but not perfectly;
   spot-check a few converted `.md` files against the original HTML if
   an answer seems off.
-- **Want this material in Phase 5's own corpus too:** copy the
+- **Want this material in the standalone corpus too:** copy the
   converted `.md` files into `/data/corpus/source` and re-run
-  `./scripts/phase5-ai-ingest.sh` — an independent, optional step, not
+  `./scripts/install-ai-ingest.sh` — an independent, optional step, not
   required for the chat-session path above.

@@ -1,6 +1,6 @@
 # Build details
 
-## Single-tier Host networking
+## Host networking
 Open WebUI, Caddy, and the SIGedge gateway use host networking but their
 application listeners bind to loopback. This gives the gateway reliable KA9Q
 multicast access and lets Open WebUI reach Caddy's private routes without

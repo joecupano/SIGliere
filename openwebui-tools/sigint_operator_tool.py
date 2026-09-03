@@ -1,6 +1,6 @@
 """
 title: SIGedge Operator Control
-author: Sigliere
+author: SIGliere
 description: Request SIGedge tuning through the authenticated local gateway.
 version: 1.0.0
 license: AGPL-3.0

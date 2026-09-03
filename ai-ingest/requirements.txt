@@ -1,10 +1,10 @@
-# ai-ingest domain — Phase 5 (AI ingest pipeline: OCR, imagery, baseline audio)
+# ai-ingest domain — OCR, imagery, and baseline audio
 #
 # Installed into the "ai-ingest" venv — see docs/venvs.md for the venv
 # registry and conventions. Do not pip install these into system Python.
 #
 # This pipeline is filesystem-only, deliberately decoupled from Open
-# WebUI/Ollama (see INSTALL.md Phase 5) — no API client
+# WebUI/Ollama (see docs/rag-knowledge-base-guide.md) — no API client
 # dependency needed as a result.
 
 docling            # DOCX/PDF parsing and structure extraction, also
@@ -21,7 +21,7 @@ nvidia-cublas-cu12 # faster-whisper's backend (ctranslate2) needs
                    # torch's own CUDA 13 packages (different files).
 nvidia-cudnn-cu12  # same reasoning — ctranslate2's CUDA path also
                    # needs CUDA-12-era cuDNN, not just cuBLAS.
-python-docx        # DOCX generation, if reused from the Job Hunter resume pipeline
+python-docx        # DOCX generation for validation fixtures
 Pillow             # image handling/normalization ahead of OCR
 pillow-heif        # HEIC/HEIF support for PIL — /data/imagery explicitly
                    # lists HEIC as a supported type (docs/data-layout.md)

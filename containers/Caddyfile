@@ -14,6 +14,7 @@ sigliere.local:8443 {
 # loopback-only: Caddy connects Open WebUI to the host Ollama and SIGedge
 # gateway services without exposing either API to the LAN.
 http://127.0.0.1:8180 {
+	bind 127.0.0.1
 	handle_path /ollama/* {
 		reverse_proxy 127.0.0.1:11434
 	}

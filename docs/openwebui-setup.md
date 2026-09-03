@@ -1,6 +1,23 @@
 # Open WebUI setup
+Open WebUI is available at `https://<hostname-ip>:8443/`.
 
-Open WebUI is available at `https://<configured-hostname>:8443/`.
+# Deployment details
+The core container has one persistent mount:
+`open-webui-state:/app/backend/data`. Collection databases, Kismet files,
+audio captures, and SDR data are not mounted because SIGedge owns them.
+
+Open WebUI binds to `127.0.0.1:8080` in the host network namespace. Its
+Ollama URL is Caddy's private route:
+`http://127.0.0.1:8180/ollama`.
+
+Native tools call the gateway through
+`http://127.0.0.1:8180/gateway`. The gateway still enforces bearer roles;
+Caddy's loopback binding is an additional network boundary, not a replacement
+for application authorization.
+
+Optional knowledge or reference integrations should be added as explicit
+Quadlet drop-ins with the smallest necessary read-only mounts. They are not
+core installation prerequisites.
 
 When Caddy's internal CA is used, export its root certificate after first
 startup and trust it on every client:
@@ -29,7 +46,9 @@ The operator tool rechecks the caller's Open WebUI `Operator` group
 membership on every call. Administrators are allowed by default; disable
 `ALLOW_ADMIN_ROLE` to require group membership for administrators too.
 
-Attach both tools to the desired model. Test in this order:
+Create a new model (Workspace > Models) from **qwen3:14B** or **llama3-groq-tool-use:8b**
+Attach both tools to the new model. Test in this order in a chat
+with the new model you have assigned the tools to:
 
 1. call `list_sigedge_nodes`;
 2. call `sigedge_status`;
@@ -39,9 +58,13 @@ Attach both tools to the desired model. Test in this order:
 Only change `SIGLIERE_GATEWAY_DRY_RUN=false` after live multicast status and
 authorization have both been verified.
 
-## Further optional tools
+## Optional SIGINT Analyst tools
 
-Three more native tools — MAC vendor lookup, SigID signal reference, and
-on-demand Whisper transcription — are available but not required for a
-core install. See [optional-tools.md](optional-tools.md).
+Three tools are available to support SIGINT Analyst investigations:
+- MAC vendor lookup (local mirror MAC vendor (OUI/CID) database.)
+- SIGid signal reference (local mirrof of SIGidWiki.)
+- On-demand Whisper transcription.
+
+These are available but not required for a core install.
+See [optional-tools.md](optional-tools.md).
 

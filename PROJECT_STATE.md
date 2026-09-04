@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-09-03
+Last updated: 2026-09-04
 
 SIGliere is the sovereign cognition tier for a SIGINT deployment. The current
 repository implements the tiered design: SIGliere owns model execution, the
@@ -58,23 +58,74 @@ particular host has been installed or has passed live multicast validation.
 
 ## Deployment work that remains operator-specific
 
-1. Replace the example entries in `gateway/config/nodes.json` with the real
-   SIGedge multicast addresses and capabilities.
+1. `gateway/config/nodes.json`'s `sigedge-hf` entry is filled in with a
+   live-verified multicast address on rubberduck (see status below).
+   `sigedge-vhf-uhf` still holds an unverified example address — no VHF/UHF
+   `radiod` instance has been brought up yet to confirm or replace it.
 2. Run the installation and validation sequence in `INSTALL.md` on the target
    host.
 3. Install the native tools in Open WebUI, assign their generated tokens, and
    configure the Operator group.
 4. Verify live status multicast, routing/interface selection, TTL, IGMP
-   behavior, and firewall policy.
+   behavior, and firewall policy. **Done for `sigedge-hf` on rubberduck** —
+   see "Live validation on rubberduck" below. `sigedge-vhf-uhf` is not yet
+   validated.
 5. Exercise an authorized tune while dry-run is enabled. Disable
    `SIGLIERE_GATEWAY_DRY_RUN` only after status and authorization checks pass.
+   Still open — rubberduck remains in dry-run.
 6. Install and mount only the optional ingest/reference capabilities that the
    deployment needs.
+
+## Live validation on rubberduck (2026-09-04)
+
+SIGliere core and SIGedge are both installed on rubberduck
+(192.168.173.65). Findings and fixes from this pass:
+
+- `scripts/validate-tiered.sh` passes all 7 checks, but only once
+  `SIGLIERE_HOSTNAME` is set to the host's actual IP-literal address
+  (`192.168.173.65` on rubberduck) — the script's default fallback
+  (`$(hostname -s).local`) does not match how `install-open-webui.sh` was
+  actually run on this host and produces a false-negative TLS-ingress
+  failure. Persisted via `export SIGLIERE_HOSTNAME=192.168.173.65` in the
+  operator's `~/.bashrc` on rubberduck; not yet reflected as a general
+  fix in the script or `INSTALL.md`.
+- The host firewall (`ufw`, installed by
+  `scripts/install-security-hardening.sh`) had no exception for KA9Q
+  multicast/UDP traffic, only `22/tcp` and `8443/tcp`. Added
+  `sudo ufw allow proto udp to 239.0.0.0/8 comment 'KA9Q multicast
+  (SIGedge)'` on rubberduck. This is host-specific state, not yet captured
+  in the installer script itself.
+- With `radiod@rx888-wwv` running (see SIGedge's own
+  `SESSION_ISSUES_2026-09-04.md` for that side of the fix), the gateway's
+  `/status/sigedge-hf` endpoint returns `"reachable": true"` with a live
+  WWV channel and real SNR — the full SIGliere→gateway→KA9Q multicast path
+  is confirmed working end-to-end for one node.
+- Known gap carried forward: `radiod`'s multicast addresses are allocated
+  dynamically per restart on this deployment (no static-address override
+  configured on the SIGedge side yet), so `nodes.json`'s `sigedge-hf`
+  address will go stale again the next time `radiod@rx888-wwv` restarts,
+  the same way it already had before this session. See SIGedge's
+  `SESSION_ISSUES_2026-09-04.md` for the recommended fix (adopt
+  `NETWORKING.md`'s static-address scheme) before relying on this for
+  anything long-running.
 
 ## Known limitations and follow-up
 
 - Repository checks cannot replace live validation against the target SIGedge
   network and KA9Q services.
+- `nodes.json` multicast addresses are only as stable as the SIGedge-side
+  `radiod` configuration. Until SIGedge instances that SIGliere depends on
+  use static multicast addressing (`NETWORKING.md`'s override scheme rather
+  than the default mDNS-hashed dynamic allocation), a `radiod` restart can
+  silently break gateway reachability until someone manually re-syncs
+  `nodes.json`. See "Live validation on rubberduck" above.
+- `scripts/validate-tiered.sh` and `scripts/install-open-webui.sh` both
+  default `SIGLIERE_HOSTNAME` to `$(hostname -s).local`, which is wrong for
+  any host actually deployed with an IP-literal `SIGLIERE_HOSTNAME` (as
+  rubberduck was) unless the operator exports the same value again before
+  every validator run. Worth fixing in the scripts themselves — e.g.
+  recording the install-time value somewhere `validate-tiered.sh` can read
+  it — rather than relying on operators to remember and re-export it.
 - The standalone AI ingest output is not automatically indexed by Open WebUI;
   chat RAG currently uses Open WebUI's separate Knowledge feature.
 - Automated ingest validation covers DOCX, image OCR, and spoken audio. A real
@@ -95,3 +146,16 @@ Verification performed on 2026-09-03:
 
 No live host, container, GPU, Open WebUI, Ollama, or SIGedge multicast tests
 were run as part of this documentation update.
+
+Live validation performed on rubberduck on 2026-09-04 (see "Live validation
+on rubberduck" above for detail):
+
+- `scripts/validate-tiered.sh` (with `SIGLIERE_HOSTNAME=192.168.173.65`): all
+  7 checks passed.
+- Gateway `/nodes` and `/status/sigedge-hf` queried directly against the
+  running `sigliere-gateway` container: `sigedge-hf` reachable, live WWV
+  channel with real SNR returned via the gateway's own `ka9q-python` client.
+- `SIGLIERE_GATEWAY_DRY_RUN` remains `true` on rubberduck; no tune was
+  exercised this session.
+- `sigedge-vhf-uhf` was not exercised — no VHF/UHF `radiod` instance was
+  brought up during this session.

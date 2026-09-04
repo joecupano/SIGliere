@@ -4,7 +4,7 @@
     {
       "node_id": "sigedge-hf",
       "label": "SIGedge HF",
-      "status_address": "239.95.191.236",
+      "status_address": "239.113.183.73",
       "min_hz": 1000000,
       "max_hz": 30000000,
       "modes": ["am", "usb", "lsb", "cw", "fm"],

@@ -55,6 +55,12 @@ particular host has been installed or has passed live multicast validation.
 - A local Open WebUI Knowledge/RAG workflow documented with an antenna-design
   example. This uses Open WebUI's native knowledge store, not the standalone
   ingest pipeline.
+- An occupancy service (`occupancy/`) that polls the SIGedge gateway's
+  `/status` endpoint and logs actively-demodulated channels into a local
+  Kismet-schema SQLite database, with an installer/validator, a persistent
+  `systemd --user` service, and a native Open WebUI query tool
+  (`occupancy_tool.py`). Ported from the sovereign-sigint project's occupancy
+  design — see "Occupancy capability added" below for what changed and why.
 
 ## Deployment work that remains operator-specific
 
@@ -77,8 +83,8 @@ particular host has been installed or has passed live multicast validation.
 5. Exercise an authorized tune while dry-run is enabled. Disable
    `SIGLIERE_GATEWAY_DRY_RUN` only after status and authorization checks pass.
    Still open — rubberduck remains in dry-run.
-6. Install and mount only the optional ingest/reference capabilities that the
-   deployment needs.
+6. Install and mount only the optional ingest/reference/occupancy
+   capabilities that the deployment needs.
 
 ## Live validation on rubberduck (2026-09-04)
 
@@ -158,6 +164,52 @@ session imported that change into `nodes.json`:
 - `SIGLIERE_GATEWAY_DRY_RUN` remains `true` on rubberduck; no tune was
   exercised.
 
+## Occupancy capability added (2026-09-04)
+
+Ported sovereign-sigint's occupancy capability (`~/sovereign-sigint`) into
+the repository as a new optional local capability, following the
+sigid-mirror install/validate/systemd/tool pattern already established.
+**Repository-only — not yet installed or live-validated on rubberduck**;
+see "Known limitations" below.
+
+- `occupancy/occupancy_schema.sql` and `occupancy_db.py`: the same Kismet
+  DEVICES/PACKETS-derived `signals`/`sightings` schema and access layer as
+  the original project, ported with only header/comment changes.
+- `occupancy/occupancy_producer.py`: the actual design departure from the
+  original. sovereign-sigint's producers read raw IQ/demodulator power
+  directly off an SDR with a hand-calibrated dBFS threshold per
+  device+antenna — forbidden here under the "Fixed architecture and
+  security rules" above (SIGliere must not read SIGedge configuration,
+  invoke its systemd units, or hold receiver/gain profiles). This producer
+  instead polls the gateway's authenticated `/status` endpoint
+  (`ka9q-python`'s `ChannelInfo`: frequency, preset, SNR — no raw samples,
+  no gain/antenna knowledge) and records a sighting for every channel
+  SIGedge currently reports as actively demodulated. There is deliberately
+  no per-site calibration step: `snr` is recorded in `metadata_json` but
+  not gated by default (`--min-snr-db` is opt-in, not a default threshold).
+- `openwebui-tools/occupancy_tool.py`: self-contained native tool
+  (`query_occupancy`, `occupancy_sightings`, `occupancy_summary`) reading
+  `occupancy.db` directly with `sqlite3`, matching the other three optional
+  tools' pattern (no import of repo modules, so it pastes cleanly into Open
+  WebUI with no in-container checkout).
+- `scripts/install-occupancy.sh` / `validate-occupancy.sh`,
+  `systemd/occupancy.service`: installer/validator pair and a persistent
+  `systemd --user` service (not a weekly timer like the mirrors —
+  occupancy needs sub-minute polling cadence). Depends on the gateway
+  already being installed, for its analyst token.
+- `docs/occupancy-guide.md`: full design writeup, explicit about what
+  carried over from sovereign-sigint versus what changed and why.
+- 15 new unit tests (`tests/test_occupancy_db.py`,
+  `tests/test_occupancy_producer.py`) covering signal-key binning, sighting
+  aggregation, both JSON shapes the gateway can return channels in
+  (dict-by-ssrc vs. list, per `gateway/tests/test_sigedge_client.py`'s own
+  fakes), unreachable-node handling, and `--min-snr-db` filtering — all
+  against faked gateway responses, no live network calls.
+- Wired into `scripts/setup-venvs.sh` (new `occupancy` venv domain),
+  `scripts/install-corpus-dirs.sh` (new `/data/occupancy` directory), and
+  every doc that lists the other three optional tools (`INSTALL.md`,
+  `README.md`, `docs/{data-layout,venvs,optional-tools,operations,README}.md`).
+
 ## Known limitations and follow-up
 
 - Repository checks cannot replace live validation against the target SIGedge
@@ -182,9 +234,16 @@ session imported that change into `nodes.json`:
   chat RAG currently uses Open WebUI's separate Knowledge feature.
 - Automated ingest validation covers DOCX, image OCR, and spoken audio. A real
   scanned PDF still requires a manual test.
-- Unit coverage is currently narrow: gateway client contract behavior and a
-  SigID manifest fallback. Service, authorization, multicast, and container
-  integration are covered by deployment validators rather than unit tests.
+- Unit coverage is currently narrow: gateway client contract behavior, a
+  SigID manifest fallback, and occupancy's schema/producer logic. Service,
+  authorization, multicast, and container integration are covered by
+  deployment validators rather than unit tests.
+- Occupancy (`occupancy/`, `occupancy.service`) has not yet been installed
+  or exercised against the live rubberduck gateway — verified only with
+  unit tests against faked gateway responses (see "Occupancy capability
+  added" above). `scripts/install-occupancy.sh` / `validate-occupancy.sh`
+  still need a real run on rubberduck before this capability can be called
+  live-verified, the same bar the gateway itself already cleared above.
 
 ## Verification baseline
 
@@ -232,3 +291,17 @@ Follow-up verification performed on rubberduck later on 2026-09-04 (see
   three real, simultaneously-running `radiod` instances.
 - `SIGLIERE_GATEWAY_DRY_RUN` remains `true` on rubberduck; no tune was
   exercised.
+
+Verification performed on 2026-09-04 (occupancy capability added, see
+"Occupancy capability added" above) — repository checks only, no live host
+or service run:
+
+- `python3 -m unittest discover -s tests -v`: 21 tests passed (15 new, all
+  against faked gateway responses).
+- `python3 -m py_compile` on `occupancy/occupancy_db.py`,
+  `occupancy/occupancy_producer.py`, and
+  `openwebui-tools/occupancy_tool.py`: completed successfully.
+- `bash -n` on `scripts/install-occupancy.sh` and
+  `scripts/validate-occupancy.sh`: completed successfully.
+- Not run: `scripts/install-occupancy.sh` / `validate-occupancy.sh`
+  themselves against the live rubberduck gateway — see "Known limitations."

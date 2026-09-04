@@ -58,18 +58,22 @@ particular host has been installed or has passed live multicast validation.
 
 ## Deployment work that remains operator-specific
 
-1. `gateway/config/nodes.json`'s `sigedge-hf` entry is filled in with a
-   live-verified multicast address on rubberduck (see status below).
-   `sigedge-vhf-uhf` still holds an unverified example address — no VHF/UHF
-   `radiod` instance has been brought up yet to confirm or replace it.
+1. `gateway/config/nodes.json`'s `sigedge-hf`, `sigedge-vhf-aprs`, and
+   `sigedge-vhf-simplex` entries now hold SIGedge's fixed, checked-in static
+   multicast addresses (status *and* data) and are live-verified on
+   rubberduck (see status below). `sigedge-vhf-uhf` remains an intentional
+   aspirational placeholder (unverified example address, no `data_address`)
+   for a general-coverage receiver that doesn't exist yet — it is distinct
+   from the two narrow real VHF nodes.
 2. Run the installation and validation sequence in `INSTALL.md` on the target
    host.
 3. Install the native tools in Open WebUI, assign their generated tokens, and
    configure the Operator group.
 4. Verify live status multicast, routing/interface selection, TTL, IGMP
-   behavior, and firewall policy. **Done for `sigedge-hf` on rubberduck** —
-   see "Live validation on rubberduck" below. `sigedge-vhf-uhf` is not yet
-   validated.
+   behavior, and firewall policy. **Done for `sigedge-hf`, `sigedge-vhf-aprs`,
+   and `sigedge-vhf-simplex` on rubberduck** — see "Live validation on
+   rubberduck" below. `sigedge-vhf-uhf` is still not validated (no receiver
+   backs it).
 5. Exercise an authorized tune while dry-run is enabled. Disable
    `SIGLIERE_GATEWAY_DRY_RUN` only after status and authorization checks pass.
    Still open — rubberduck remains in dry-run.
@@ -107,18 +111,66 @@ SIGliere core and SIGedge are both installed on rubberduck
   the same way it already had before this session. See SIGedge's
   `SESSION_ISSUES_2026-09-04.md` for the recommended fix (adopt
   `NETWORKING.md`'s static-address scheme) before relying on this for
-  anything long-running.
+  anything long-running. **Resolved later the same day** — see below.
+
+### Follow-up on rubberduck (2026-09-04, same day): static addressing adopted
+
+SIGedge switched all three reference `radiod` instances
+(`rx888-wwv`, `hackrf-aprs`, `rtlsdr-simplex`) to fixed, checked-in static
+multicast addresses (`NETWORKING.md`'s scheme), closing the gap above. This
+session imported that change into `nodes.json`:
+
+- `sigedge-hf` repointed from the now-stale dynamic address
+  (`239.113.183.73`) to the static `239.192.1.10` (status) /
+  `239.192.64.10` (data).
+- Two new nodes added for the two running VHF missions that didn't match
+  `sigedge-vhf-uhf`'s wideband placeholder: `sigedge-vhf-aprs`
+  (`239.192.1.20`/`239.192.64.20`, 144.390 MHz FM only) and
+  `sigedge-vhf-simplex` (`239.192.1.30`/`239.192.64.30`, 144.650 MHz FM
+  only). `sigedge-vhf-uhf` itself is left unchanged — still an aspirational
+  placeholder for a real wideband receiver, not yet built.
+- Diagnosed and fixed open item carried in `NEEDED-WORK.md`: with three
+  simultaneous `radiod` instances live on rubberduck, `discover_channels_native`
+  was confirmed to leak cross-node channels — querying one node's
+  `status_address` sometimes returned another node's channel too (ka9q-python's
+  native listener binds its socket to `INADDR_ANY:5006` and joins the
+  requested multicast group, but does not filter *received* packets by
+  destination address, so traffic for any other group already joined on the
+  host's port 5006 gets delivered to it as well). Fixed in
+  `sigedge_client.py`: `SigedgeNode` gained an optional `data_address` field
+  (the node's known data-multicast address); `SigedgeClient.status()` now
+  filters `discover_channels_native`'s result down to channels whose
+  `multicast_address` actually matches it. `nodes.json` was updated with
+  `data_address` for all three real nodes (not `sigedge-vhf-uhf`, which has
+  no known data address). Covered by two new unit tests in
+  `tests/test_sigedge_client.py`.
+- Rebuilt and restarted the live `sigliere-gateway` container
+  (`scripts/install-sigedge-gateway.sh`) so both the `nodes.json` edit and
+  the `sigedge_client.py` fix took effect, then re-verified directly against
+  the running container: `sigedge-hf`, `sigedge-vhf-aprs`, and
+  `sigedge-vhf-simplex` each now report `reachable: true` with exactly their
+  own channel (SSRC 10000/WWV, 144390/APRS, 144650/simplex respectively) and
+  no cross-node bleed. `sigedge-vhf-uhf` (no `data_address`) still shows the
+  old unfiltered behavior, consistent with it being an unverified
+  placeholder rather than a real backed node.
+- `scripts/validate-tiered.sh` re-run with `SIGLIERE_HOSTNAME=192.168.173.65`:
+  all 7 checks still pass.
+- `SIGLIERE_GATEWAY_DRY_RUN` remains `true` on rubberduck; no tune was
+  exercised.
 
 ## Known limitations and follow-up
 
 - Repository checks cannot replace live validation against the target SIGedge
   network and KA9Q services.
-- `nodes.json` multicast addresses are only as stable as the SIGedge-side
-  `radiod` configuration. Until SIGedge instances that SIGliere depends on
-  use static multicast addressing (`NETWORKING.md`'s override scheme rather
-  than the default mDNS-hashed dynamic allocation), a `radiod` restart can
-  silently break gateway reachability until someone manually re-syncs
-  `nodes.json`. See "Live validation on rubberduck" above.
+- `sigedge-hf`, `sigedge-vhf-aprs`, and `sigedge-vhf-simplex` now use
+  SIGedge's static multicast addressing, which is stable across `radiod`
+  restarts (confirmed on rubberduck 2026-09-04). Any *future* SIGedge node
+  added to `nodes.json` should get a `data_address` from the same static
+  scheme up front — without one, `SigedgeClient.status()` falls back to
+  `discover_channels_native`'s raw (and, per the finding above, potentially
+  cross-contaminated) result.
+- `sigedge-vhf-uhf` remains an unverified aspirational placeholder — no
+  general-coverage VHF/UHF receiver has been built to confirm or replace it.
 - `scripts/validate-tiered.sh` and `scripts/install-open-webui.sh` both
   default `SIGLIERE_HOSTNAME` to `$(hostname -s).local`, which is wrong for
   any host actually deployed with an IP-literal `SIGLIERE_HOSTNAME` (as
@@ -159,3 +211,24 @@ on rubberduck" above for detail):
   exercised this session.
 - `sigedge-vhf-uhf` was not exercised — no VHF/UHF `radiod` instance was
   brought up during this session.
+
+Follow-up verification performed on rubberduck later on 2026-09-04 (see
+"Follow-up on rubberduck" above for detail):
+
+- `python3 -m unittest discover -s tests -v`: 6 tests passed (2 new, covering
+  `SigedgeClient.status()`'s cross-node `data_address` filtering and its
+  legacy unfiltered fallback).
+- `python3 -m json.tool gateway/config/nodes.json`, `python3 -m py_compile`
+  on `gateway/src/sigedge_client.py` and `gateway/src/sigedge_gateway.py`,
+  and `bash -n scripts/*.sh` all completed successfully.
+- `scripts/install-sigedge-gateway.sh` rebuilt the `sigliere-gateway` image
+  and restarted the live service; its own health check reported healthy.
+- `scripts/validate-tiered.sh` (with `SIGLIERE_HOSTNAME=192.168.173.65`): all
+  7 checks passed.
+- Direct in-container check against the rebuilt gateway's own
+  `GatewayState`/`SigedgeClient`: `sigedge-hf`, `sigedge-vhf-aprs`, and
+  `sigedge-vhf-simplex` each returned `reachable: true` with exactly one
+  channel — their own — confirming the cross-node filtering fix against all
+  three real, simultaneously-running `radiod` instances.
+- `SIGLIERE_GATEWAY_DRY_RUN` remains `true` on rubberduck; no tune was
+  exercised.

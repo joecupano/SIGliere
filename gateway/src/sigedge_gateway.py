@@ -47,6 +47,7 @@ class GatewayState:
                 max_hz=float(item["max_hz"]),
                 modes=tuple(str(mode).lower() for mode in item["modes"]),
                 control_enabled=bool(item.get("control_enabled", False)),
+                data_address=item.get("data_address"),
             )
             if node.node_id in nodes:
                 raise RuntimeError(f"duplicate node_id: {node.node_id}")
@@ -89,6 +90,7 @@ def public_node(node: SigedgeNode) -> dict[str, Any]:
         "node_id": node.node_id,
         "label": node.label,
         "status_address": node.status_address,
+        "data_address": node.data_address,
         "min_hz": node.min_hz,
         "max_hz": node.max_hz,
         "modes": list(node.modes),

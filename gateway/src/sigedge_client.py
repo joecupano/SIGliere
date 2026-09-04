@@ -18,6 +18,7 @@ class SigedgeNode:
     max_hz: float
     modes: tuple[str, ...]
     control_enabled: bool = False
+    data_address: str | None = None
 
 
 def _jsonable(value: Any) -> Any:
@@ -55,6 +56,19 @@ class SigedgeClient:
         channels = sdk.discover_channels_native(
             node.status_address, listen_duration=self.discovery_seconds
         )
+        # ka9q-python's native listener binds its socket to INADDR_ANY:5006 and
+        # joins the requested status group, but on a host where other radiod
+        # instances' groups are already joined (e.g. by other clients on the
+        # same LAN), Linux delivers traffic for *all* joined groups on that
+        # port to the wildcard-bound socket — it does not filter by
+        # destination address. Confirmed live on rubberduck 2026-09-04:
+        # querying one node's status_address returned channels whose
+        # multicast_address belonged to a different radiod instance
+        # entirely. When the node contract declares the node's own data
+        # address, filter the result down to channels that actually belong
+        # to it rather than trusting discover_channels_native's own scoping.
+        if node.data_address:
+            channels = self._filter_by_data_address(channels, node.data_address)
         normalized = _jsonable(channels)
         return {
             "node_id": node.node_id,
@@ -64,6 +78,30 @@ class SigedgeClient:
             "channel_count": len(channels),
             "channels": normalized,
         }
+
+    @staticmethod
+    def _channel_data_address(channel: Any) -> str | None:
+        if isinstance(channel, dict):
+            value = channel.get("multicast_address")
+        else:
+            value = getattr(channel, "multicast_address", None)
+        return str(value) if value else None
+
+    @classmethod
+    def _filter_by_data_address(cls, channels: Any, data_address: str) -> Any:
+        if isinstance(channels, dict):
+            return {
+                ssrc: channel
+                for ssrc, channel in channels.items()
+                if cls._channel_data_address(channel) == data_address
+            }
+        if isinstance(channels, (list, tuple)):
+            return [
+                channel
+                for channel in channels
+                if cls._channel_data_address(channel) == data_address
+            ]
+        return channels
 
     def tune(self, node: SigedgeNode, *, frequency_hz: float, mode: str) -> dict[str, Any]:
         if not node.control_enabled:

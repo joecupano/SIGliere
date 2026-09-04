@@ -4,7 +4,8 @@
     {
       "node_id": "sigedge-hf",
       "label": "SIGedge HF",
-      "status_address": "239.113.183.73",
+      "status_address": "239.192.1.10",
+      "data_address": "239.192.64.10",
       "min_hz": 1000000,
       "max_hz": 30000000,
       "modes": ["am", "usb", "lsb", "cw", "fm"],
@@ -18,7 +19,26 @@
       "max_hz": 6000000000,
       "modes": ["am", "usb", "lsb", "cw", "nfm", "wfm", "fm"],
       "control_enabled": true
+    },
+    {
+      "node_id": "sigedge-vhf-aprs",
+      "label": "SIGedge VHF APRS",
+      "status_address": "239.192.1.20",
+      "data_address": "239.192.64.20",
+      "min_hz": 144390000,
+      "max_hz": 144390000,
+      "modes": ["fm"],
+      "control_enabled": true
+    },
+    {
+      "node_id": "sigedge-vhf-simplex",
+      "label": "SIGedge VHF Simplex",
+      "status_address": "239.192.1.30",
+      "data_address": "239.192.64.30",
+      "min_hz": 144650000,
+      "max_hz": 144650000,
+      "modes": ["fm"],
+      "control_enabled": true
     }
   ]
 }
-

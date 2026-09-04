@@ -10,6 +10,7 @@ SIGliere stores only AI and optional reference data:
 /data/reference/mac-vendors      optional MAC vendor mirror
 /data/imagery                    optional analysis inputs
 /data/audio                      optional transcription inputs
+/data/occupancy                  optional occupancy (signals-heard) database
 ```
 
 Collection databases, packet captures, IQ, SigMF, and receiver recordings

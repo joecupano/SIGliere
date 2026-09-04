@@ -28,7 +28,7 @@ OWNER="${1:-${SUDO_USER:-}}"
   exit 1
 }
 
-for path in   /data/models   /data/corpus/source   /data/corpus/processed   /data/imagery   /data/audio; do
+for path in   /data/models   /data/corpus/source   /data/corpus/processed   /data/imagery   /data/audio   /data/occupancy; do
   install -d -m 0750 -o "${OWNER%%:*}" -g "${OWNER#*:}" "${path}"
 done
 

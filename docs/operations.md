@@ -54,7 +54,7 @@ Never commit or paste real tokens into repository files or logs.
 Stop the user services before a consistent backup:
 
 ```bash
-systemctl --user stop caddy.service open-webui.service sigliere-gateway.service
+systemctl --user stop caddy.service open-webui.service sigliere-gateway.service occupancy.service
 ```
 
 Back up these items to encrypted storage:
@@ -64,8 +64,9 @@ Back up these items to encrypted storage:
 - `~/.config/sigliere/gateway.env`: gateway credentials and dry-run setting.
 - `~/.config/containers/systemd/`: installed Quadlets, Caddy configuration,
   certificates, and optional drop-ins.
-- `/data/models`, `/data/corpus`, `/data/reference`, `/data/imagery`, and
-  `/data/audio`, according to local retention requirements.
+- `/data/models`, `/data/corpus`, `/data/reference`, `/data/imagery`,
+  `/data/audio`, and `/data/occupancy`, according to local retention
+  requirements.
 
 Inspect volume locations with `podman volume inspect` and use the host backup
 system to capture them. Restart the services afterward:
@@ -74,6 +75,9 @@ system to capture them. Restart the services afterward:
 systemctl --user start sigliere-gateway.service open-webui.service caddy.service
 ./scripts/validate-tiered.sh
 ```
+
+If occupancy is installed, also restart it (it depends on the gateway being
+up first): `systemctl --user start occupancy.service`.
 
 Test restoration on a non-production host. Do not overwrite a running volume.
 

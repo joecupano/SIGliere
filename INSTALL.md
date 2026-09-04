@@ -112,6 +112,14 @@ Install the local reference mirrors. Initial syncs require internet access:
 ./scripts/validate-mac-mirror.sh
 ```
 
+Install occupancy (signals-heard logging against the live gateway; requires
+step 3 above already done):
+
+```bash
+./scripts/install-occupancy.sh
+./scripts/validate-occupancy.sh
+```
+
 Follow [optional-tools.md](docs/optional-tools.md) to add only the read-only
 Open WebUI mounts and native tools that the deployment needs. For chat RAG,
 follow [rag-knowledge-base-guide.md](docs/rag-knowledge-base-guide.md); the

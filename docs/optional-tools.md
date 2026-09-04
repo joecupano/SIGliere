@@ -1,16 +1,19 @@
 # Optional native tools
 
 Beyond the core SIGedge Status and Operator tools ([openwebui-setup.md](openwebui-setup.md)),
-`openwebui-tools/` ships three more native tools. All three are optional —
+`openwebui-tools/` ships four more native tools. All four are optional —
 none are required to complete [INSTALL.md](../INSTALL.md) — and each
 uses local mirrors or files at runtime; tool calls do not leave the
 host. Initial mirror and model downloads still require network access.
+Occupancy is the exception worth flagging: its data comes from the live
+gateway (loopback-only, still host-local), not a mirror.
 
 | Tool | File | Needs |
 |---|---|---|
 | MAC Vendor Lookup | `mac_lookup_tool.py` | `/data/reference/mac-vendors` mirror |
 | SigID Reference | `sigid_reference_tool.py` | `/data/reference/sigid` mirror |
 | Whisper Transcription | `sigint_whisper_tool.py` | `/data/audio` (already created by `install-corpus-dirs.sh`) |
+| Occupancy | `occupancy_tool.py` | `/data/occupancy` (written by `occupancy.service`) |
 
 ## Mount the data in first
 
@@ -27,6 +30,7 @@ cat > ~/.config/containers/systemd/open-webui.container.d/reference-mounts.conf 
 Volume=/data/reference/mac-vendors:/data/mac-vendors-ref:ro
 Volume=/data/reference/sigid:/data/sigid-ref:ro
 Volume=/data/audio:/data/audio:ro
+Volume=/data/occupancy:/data/occupancy-ref:ro
 EOF
 
 systemctl --user daemon-reload
@@ -102,3 +106,25 @@ immediately when asked.
    drop-in file.
 6. Attach to a model and test with `list_audio_files` first, then
    `transcribe_audio` on one of the listed files.
+
+## Occupancy
+
+Logs which frequencies SIGedge has actively demodulated — a signals-heard
+record, not a signal identification. See
+[occupancy-guide.md](occupancy-guide.md) for the full design, including why
+it's built as a gateway poller rather than a direct SDR capture. Requires
+the gateway already installed (`./scripts/install-sigedge-gateway.sh`).
+
+1. Run `./scripts/install-occupancy.sh` (not `sudo`) to install the
+   `occupancy` venv and start `occupancy.service`, a persistent poller of
+   the gateway's `/status` endpoint. Validate with
+   `./scripts/validate-occupancy.sh`.
+2. Add the `occupancy` `Volume=` line from above and restart Open WebUI.
+3. **Workspace → Tools → Create a new tool**, paste
+   `openwebui-tools/occupancy_tool.py`.
+4. Leave the `OCCUPANCY_DB_PATH` valve at its default
+   (`/data/occupancy-ref/occupancy.db`) — it matches the mount target above.
+5. Attach to a model and test with `occupancy_summary` first, then
+   `query_occupancy` (e.g. `near_frequency_hz` for a known SIGedge node
+   frequency) and `occupancy_sightings` (by `signal_key` from a
+   `query_occupancy` result).

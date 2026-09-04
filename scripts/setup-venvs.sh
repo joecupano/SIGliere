@@ -6,6 +6,7 @@ VENV_ROOT="${HOME}/.local/share/sigliere/venvs"
 declare -A DOMAINS=(
   [ai-ingest]="ai-ingest/requirements.txt"
   [reference]="reference/requirements.txt"
+  [occupancy]="occupancy/requirements.txt"
 )
 
 TARGETS=("$@")

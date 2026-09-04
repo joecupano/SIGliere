@@ -6,7 +6,8 @@
 - [Data layout](data-layout.md) — AI-tier storage and collection exclusions.
 - [Python environments](venvs.md) — capability-specific virtual environments.
 - [Open WebUI setup](openwebui-setup.md) — native tools and model configuration.
-- [Optional native tools](optional-tools.md) — MAC, SigID, and Whisper tools.
+- [Optional native tools](optional-tools.md) — MAC, SigID, Whisper, and Occupancy tools.
+- [Occupancy guide](occupancy-guide.md) — signals-heard logging design and use.
 - [Local RAG guide](rag-knowledge-base-guide.md) — Open WebUI Knowledge workflow.
 - [Operations](operations.md) — production control, credentials, backups, and upgrades.
 - [Security](security-hardening.md) — TLS, loopback bindings, and firewall.

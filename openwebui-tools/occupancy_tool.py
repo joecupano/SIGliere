@@ -11,8 +11,7 @@ license: AGPL-3.0
 # THE THIRD AI SOURCE (see sigid_reference_tool.py for the full three-way
 # split):
 #   occupancy = what frequencies are active (our own capture) <- this tool
-#   kismet    = what WiFi devices are present (not built here — no Kismet
-#               bridge exists in SIGliere; that capability stays SIGedge-side)
+#   kismet    = what devices are present (our own capture — see kismet_tool.py)
 #   sigid     = what signals ARE — the reference catalog to identify them
 #
 # occupancy.db is written host-side by occupancy/occupancy_producer.py,

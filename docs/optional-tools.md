@@ -1,12 +1,13 @@
 # Optional native tools
 
 Beyond the core SIGedge Status and Operator tools ([openwebui-setup.md](openwebui-setup.md)),
-`openwebui-tools/` ships four more native tools. All four are optional —
+`openwebui-tools/` ships five more native tools. All five are optional —
 none are required to complete [INSTALL.md](../INSTALL.md) — and each
 uses local mirrors or files at runtime; tool calls do not leave the
 host. Initial mirror and model downloads still require network access.
-Occupancy is the exception worth flagging: its data comes from the live
-gateway (loopback-only, still host-local), not a mirror.
+Occupancy and the Kismet bridge are the exceptions worth flagging: their
+data comes from the live gateway (loopback-only, still host-local), not a
+mirror.
 
 | Tool | File | Needs |
 |---|---|---|
@@ -14,6 +15,7 @@ gateway (loopback-only, still host-local), not a mirror.
 | SigID Reference | `sigid_reference_tool.py` | `/data/reference/sigid` mirror |
 | Whisper Transcription | `sigint_whisper_tool.py` | `/data/audio` (already created by `install-corpus-dirs.sh`) |
 | Occupancy | `occupancy_tool.py` | `/data/occupancy` (written by `occupancy.service`) |
+| Kismet Bridge | `kismet_tool.py` | `/data/kismet-bridge` (written by `kismet-bridge.service`) |
 
 ## Mount the data in first
 
@@ -31,6 +33,7 @@ Volume=/data/reference/mac-vendors:/data/mac-vendors-ref:ro
 Volume=/data/reference/sigid:/data/sigid-ref:ro
 Volume=/data/audio:/data/audio:ro
 Volume=/data/occupancy:/data/occupancy-ref:ro
+Volume=/data/kismet-bridge:/data/kismet-bridge-ref:ro
 EOF
 
 systemctl --user daemon-reload
@@ -128,3 +131,31 @@ the gateway already installed (`./scripts/install-sigedge-gateway.sh`).
    `query_occupancy` (e.g. `near_frequency_hz` for a known SIGedge node
    frequency) and `occupancy_sightings` (by `signal_key` from a
    `query_occupancy` result).
+
+## Kismet Bridge
+
+Mirrors which WiFi, Bluetooth, and ISM-band devices SIGedge's Kismet
+capture has seen — device presence, not frequency activity (that's
+Occupancy, above) and not signal identification (that's SigID Reference).
+See [kismet-bridge-guide.md](kismet-bridge-guide.md) for the full design,
+including why it's a gateway poller rather than a mounted `.kismet` file.
+Requires the gateway already installed
+(`./scripts/install-sigedge-gateway.sh`), plus at least one node with
+`kismet_host` set and a matching API key in
+`SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON` (see
+[gateway/README.md](../gateway/README.md#kismet-bridge)).
+
+1. Run `./scripts/install-kismet-bridge.sh` (not `sudo`) to install the
+   `kismet-bridge` venv and start `kismet-bridge.service`, a persistent
+   poller of the gateway's `/kismet/summary/{node}` and
+   `/kismet/devices/{node}` endpoints. Validate with
+   `./scripts/validate-kismet-bridge.sh`.
+2. Add the `kismet-bridge` `Volume=` line from above and restart Open WebUI.
+3. **Workspace → Tools → Create a new tool**, paste
+   `openwebui-tools/kismet_tool.py`.
+4. Leave the `KISMET_BRIDGE_DB_PATH` valve at its default
+   (`/data/kismet-bridge-ref/kismet_bridge.db`) — it matches the mount
+   target above.
+5. Attach to a model and test with `kismet_summary` first, then
+   `query_wifi_devices` (by `mac`, `ssid`, `device_type`, `phy`, or
+   `node_id`).

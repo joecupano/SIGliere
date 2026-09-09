@@ -49,12 +49,27 @@ Open WebUI tool valves. The old tokens stop working after the restart. Run
 
 Never commit or paste real tokens into repository files or logs.
 
+## Rotate Kismet bridge API keys
+
+Per-node Kismet API keys in `SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON`
+(`~/.config/sigliere/gateway.env`) are independent of the gateway's own
+analyst/operator tokens above — see
+[gateway/README.md](../gateway/README.md#kismet-bridge). To rotate one,
+generate a new key against that node's Kismet instance
+(`/auth/apikey/generate.cmd`, `readonly` role), replace the entry for that
+`node_id` in `SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON`, restart
+`sigliere-gateway.service`, then revoke the old key in Kismet. The old key
+stops working for the gateway immediately on restart regardless of
+revocation, since the gateway never caches a session — revoking it in
+Kismet closes the window where it could still be used directly against
+Kismet's own REST API.
+
 ## Back up persistent state
 
 Stop the user services before a consistent backup:
 
 ```bash
-systemctl --user stop caddy.service open-webui.service sigliere-gateway.service occupancy.service
+systemctl --user stop caddy.service open-webui.service sigliere-gateway.service occupancy.service kismet-bridge.service
 ```
 
 Back up these items to encrypted storage:
@@ -65,8 +80,8 @@ Back up these items to encrypted storage:
 - `~/.config/containers/systemd/`: installed Quadlets, Caddy configuration,
   certificates, and optional drop-ins.
 - `/data/models`, `/data/corpus`, `/data/reference`, `/data/imagery`,
-  `/data/audio`, and `/data/occupancy`, according to local retention
-  requirements.
+  `/data/audio`, `/data/occupancy`, and `/data/kismet-bridge`, according to
+  local retention requirements.
 
 Inspect volume locations with `podman volume inspect` and use the host backup
 system to capture them. Restart the services afterward:

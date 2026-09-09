@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+import requests
+
 try:
     import ka9q  # type: ignore
 except Exception:  # pragma: no cover - exercised by deployment preflight
@@ -19,6 +21,17 @@ class SigedgeNode:
     modes: tuple[str, ...]
     control_enabled: bool = False
     data_address: str | None = None
+    # Optional — not every SIGedge node runs Kismet (a node might be
+    # radiod-only). Present only for nodes that do, per nodes.json's own
+    # "no host path/systemd unit/device profile" discipline: this is a
+    # network address+port, the same category of fact status_address and
+    # data_address already are.
+    kismet_host: str | None = None
+    kismet_port: int | None = None
+
+    @property
+    def kismet_enabled(self) -> bool:
+        return self.kismet_host is not None
 
 
 def _jsonable(value: Any) -> Any:
@@ -161,4 +174,128 @@ class SigedgeClient:
         if isinstance(result, (tuple, list)) and result and isinstance(result[0], int):
             return result[0]
         return None
+
+
+# ---------------------------------------------------------------------------
+# Kismet REST bridge
+#
+# A genuinely different integration shape from the KA9Q side above: a real
+# HTTP client call per request against Kismet's own REST API, not a
+# passively-aggregated multicast subscription — Kismet has no multicast
+# status protocol to listen to.
+#
+# Auth: verified against Kismet's current docs
+# (https://www.kismetwireless.net/docs/api/login/) rather than assumed.
+# Kismet supports both HTTP Basic Auth (username/password, issuing a
+# session cookie) and pre-provisioned API keys scoped to a role. An API
+# key is the better fit here — it needs no session-cookie lifecycle across
+# stateless per-request gateway calls, and can be provisioned as a
+# standalone "readonly" role credential rather than a real login. Per
+# Kismet's own docs: "API-token-only consumers of the API should provide
+# ONLY the API token given, and supply it in the KISMET cookie or URI
+# parameter." This client sends it as the KISMET cookie.
+#
+# Field paths and endpoint shapes below (POST with a form-encoded "json"
+# field carrying the field-simplification spec, not a raw JSON body) are
+# sourced from Kismet's own REST docs and the reference
+# https://github.com/kismetwireless/python-kismet-rest client, not
+# discovered against a live instance during this build — validate against
+# the actual Kismet version SIGedge runs (kismet_site.conf) before relying
+# on this in production, same as every other real-but-unverified item this
+# feature flags rather than guesses past.
+class KismetClient:
+    """Kismet REST API client — curated, not a raw proxy."""
+
+    def __init__(
+        self,
+        credentials: dict[str, str] | None = None,
+        *,
+        timeout: float = 10.0,
+        session: requests.Session | None = None,
+    ) -> None:
+        self.credentials = credentials or {}
+        self.timeout = timeout
+        self.session = session or requests.Session()
+
+    def _base_url(self, node: SigedgeNode) -> str:
+        if not node.kismet_host:
+            raise RuntimeError(f"{node.node_id} has no kismet_host configured")
+        port = node.kismet_port or 2501
+        return f"http://{node.kismet_host}:{port}"
+
+    def _apikey(self, node: SigedgeNode) -> str:
+        key = self.credentials.get(node.node_id)
+        if not key:
+            raise RuntimeError(
+                f"no Kismet API key configured for {node.node_id} "
+                "(SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON)"
+            )
+        return key
+
+    def _post_fields(self, node: SigedgeNode, path: str, fields: list) -> Any:
+        """POST one field-simplified request against Kismet's REST API.
+        Kismet's POST convention is a form field named "json" carrying the
+        serialized request body, not a raw JSON request body."""
+        import json as _json
+
+        url = f"{self._base_url(node)}/{path.lstrip('/')}"
+        response = self.session.post(
+            url,
+            data={"json": _json.dumps({"fields": fields})},
+            cookies={"KISMET": self._apikey(node)},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    # Fields shared by summary() and devices() — one underlying Kismet
+    # call backs both curated gateway endpoints, matching /status's own
+    # "one poll, one shaped response" pattern.
+    _DEVICE_FIELDS = [
+        ["kismet.device.base.macaddr", "mac"],
+        ["kismet.device.base.phyname", "phy"],
+        ["kismet.device.base.type", "type"],
+        ["kismet.device.base.manuf", "manuf"],
+        ["kismet.device.base.signal/kismet.common.signal.last_signal", "signal_dbm"],
+        ["kismet.device.base.first_time", "first_time"],
+        ["kismet.device.base.last_time", "last_time"],
+        [
+            "dot11.device/dot11.device.last_beaconed_ssid_record/"
+            "dot11.advertisedssid.ssid",
+            "ssid",
+        ],
+    ]
+
+    def _fetch_devices(self, node: SigedgeNode) -> list[dict]:
+        raw = self._post_fields(node, "devices/last-time/0/devices.json", self._DEVICE_FIELDS)
+        return raw if isinstance(raw, list) else []
+
+    def summary(self, node: SigedgeNode) -> dict[str, Any]:
+        """Device counts by type/PHY and the capture time range — mirrors
+        sovereign-sigint's kismet_summary()."""
+        devices = self._fetch_devices(node)
+        by_type: dict[str, int] = {}
+        by_phy: dict[str, int] = {}
+        first_times = []
+        last_times = []
+        for d in devices:
+            by_type[d.get("type") or "unknown"] = by_type.get(d.get("type") or "unknown", 0) + 1
+            by_phy[d.get("phy") or "unknown"] = by_phy.get(d.get("phy") or "unknown", 0) + 1
+            if d.get("first_time"):
+                first_times.append(d["first_time"])
+            if d.get("last_time"):
+                last_times.append(d["last_time"])
+        return {
+            "node_id": node.node_id,
+            "device_count": len(devices),
+            "by_type": by_type,
+            "by_phy": by_phy,
+            "first_seen_sec": min(first_times) if first_times else None,
+            "last_seen_sec": max(last_times) if last_times else None,
+        }
+
+    def devices(self, node: SigedgeNode) -> dict[str, Any]:
+        """Device list with MAC, type, signal, SSID, manufacturer,
+        first/last-seen — mirrors sovereign-sigint's query_wifi_devices()."""
+        return {"node_id": node.node_id, "devices": self._fetch_devices(node)}
 

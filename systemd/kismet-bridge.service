@@ -1,0 +1,16 @@
+[Unit]
+Description=SIGliere Kismet bridge — poll SIGedge gateway Kismet endpoints, mirror devices
+After=sigliere-gateway.service
+Wants=sigliere-gateway.service
+
+[Service]
+Type=simple
+# __REPO_ROOT__ and __VENV_PYTHON__ substituted by
+# scripts/install-kismet-bridge.sh at install time.
+WorkingDirectory=__REPO_ROOT__/kismet_bridge
+ExecStart=__VENV_PYTHON__ __REPO_ROOT__/kismet_bridge/kismet_bridge_producer.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

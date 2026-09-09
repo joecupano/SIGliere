@@ -8,7 +8,7 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from sigedge_client import SigedgeClient, SigedgeNode
+from sigedge_client import KismetClient, SigedgeClient, SigedgeNode
 
 ROLE_ORDER = {"analyst": 1, "operator": 2}
 
@@ -31,6 +31,15 @@ class GatewayState:
             raise RuntimeError("SIGLIERE_GATEWAY_TOKENS_JSON must be valid JSON") from exc
         dry_run = os.environ.get("SIGLIERE_GATEWAY_DRY_RUN", "true").lower() == "true"
         self.client = SigedgeClient(dry_run=dry_run)
+        try:
+            kismet_credentials: dict[str, str] = json.loads(
+                os.environ.get("SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON", "{}")
+            )
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                "SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON must be valid JSON"
+            ) from exc
+        self.kismet_client = KismetClient(credentials=kismet_credentials)
 
     @staticmethod
     def _load_nodes(path: Path) -> dict[str, SigedgeNode]:
@@ -48,6 +57,8 @@ class GatewayState:
                 modes=tuple(str(mode).lower() for mode in item["modes"]),
                 control_enabled=bool(item.get("control_enabled", False)),
                 data_address=item.get("data_address"),
+                kismet_host=item.get("kismet_host"),
+                kismet_port=item.get("kismet_port"),
             )
             if node.node_id in nodes:
                 raise RuntimeError(f"duplicate node_id: {node.node_id}")
@@ -95,6 +106,7 @@ def public_node(node: SigedgeNode) -> dict[str, Any]:
         "max_hz": node.max_hz,
         "modes": list(node.modes),
         "control_enabled": node.control_enabled,
+        "kismet_enabled": node.kismet_enabled,
     }
 
 
@@ -136,6 +148,37 @@ def node_status(node_id: str, _: Annotated[str, Depends(analyst)]) -> dict[str, 
         return state.client.status(node)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+def _kismet_node(node_id: str) -> SigedgeNode:
+    node = state.nodes.get(node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="unknown node_id")
+    if not node.kismet_enabled:
+        raise HTTPException(status_code=409, detail=f"{node_id} has no Kismet configured")
+    return node
+
+
+@app.get("/kismet/summary/{node_id}")
+def kismet_summary(node_id: str, _: Annotated[str, Depends(analyst)]) -> dict[str, Any]:
+    node = _kismet_node(node_id)
+    try:
+        return state.kismet_client.summary(node)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"{exc.__class__.__name__}: {exc}") from exc
+
+
+@app.get("/kismet/devices/{node_id}")
+def kismet_devices(node_id: str, _: Annotated[str, Depends(analyst)]) -> dict[str, Any]:
+    node = _kismet_node(node_id)
+    try:
+        return state.kismet_client.devices(node)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"{exc.__class__.__name__}: {exc}") from exc
 
 
 @app.post("/tune")

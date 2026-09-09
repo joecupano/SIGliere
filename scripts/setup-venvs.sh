@@ -7,6 +7,7 @@ declare -A DOMAINS=(
   [ai-ingest]="ai-ingest/requirements.txt"
   [reference]="reference/requirements.txt"
   [occupancy]="occupancy/requirements.txt"
+  [kismet-bridge]="kismet_bridge/requirements.txt"
 )
 
 TARGETS=("$@")

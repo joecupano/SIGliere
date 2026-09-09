@@ -120,6 +120,18 @@ step 3 above already done):
 ./scripts/validate-occupancy.sh
 ```
 
+Install the Kismet bridge (device-presence mirror against the live
+gateway's Kismet endpoints; requires step 3 above already done, plus at
+least one node with `kismet_host` set and a matching API key in
+`SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON` — see
+[gateway/README.md](gateway/README.md#kismet-bridge) and
+[KISMET-BRIDGE.md](KISMET-BRIDGE.md)):
+
+```bash
+./scripts/install-kismet-bridge.sh
+./scripts/validate-kismet-bridge.sh
+```
+
 Follow [optional-tools.md](docs/optional-tools.md) to add only the read-only
 Open WebUI mounts and native tools that the deployment needs. For chat RAG,
 follow [rag-knowledge-base-guide.md](docs/rag-knowledge-base-guide.md); the

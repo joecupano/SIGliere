@@ -11,6 +11,7 @@ SIGliere stores only AI and optional reference data:
 /data/imagery                    optional analysis inputs
 /data/audio                      optional transcription inputs
 /data/occupancy                  optional occupancy (signals-heard) database
+/data/kismet-bridge              optional Kismet device-presence mirror database
 ```
 
 Collection databases, packet captures, IQ, SigMF, and receiver recordings

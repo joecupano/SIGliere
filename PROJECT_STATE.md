@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-09-04
+Last updated: 2026-09-09
 
 SIGliere is the sovereign cognition tier for a SIGINT deployment. The current
 repository implements the tiered design: SIGliere owns model execution, the
@@ -61,6 +61,14 @@ particular host has been installed or has passed live multicast validation.
   `systemd --user` service, and a native Open WebUI query tool
   (`occupancy_tool.py`). Ported from the sovereign-sigint project's occupancy
   design — see "Occupancy capability added" below for what changed and why.
+- A Kismet bridge (`kismet_bridge/`) — the third AI data source
+  (occupancy/kismet/sigid) that was reserved but not built until now. New
+  gateway endpoints (`GET /kismet/summary/{node_id}`,
+  `GET /kismet/devices/{node_id}`) make a curated, per-request HTTP call to
+  a node's Kismet REST API, authenticated with a per-node API key
+  (`SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON`); a producer mirrors device
+  presence into a local `kismet_bridge.db`; a native Open WebUI tool
+  (`kismet_tool.py`) queries it. See "Kismet bridge capability added" below.
 
 ## Deployment work that remains operator-specific
 
@@ -210,6 +218,81 @@ see "Known limitations" below.
   every doc that lists the other three optional tools (`INSTALL.md`,
   `README.md`, `docs/{data-layout,venvs,optional-tools,operations,README}.md`).
 
+## Kismet bridge capability added (2026-09-09)
+
+Built the third AI data source named but deliberately not built in
+`occupancy_tool.py`'s own header comment ("no Kismet bridge exists in
+SIGliere; that capability stays SIGedge-side"). Spec lived in
+`KISMET-BRIDGE.md` at the repo root; see `docs/kismet-bridge-guide.md` for
+the full design writeup. **Repository-only — not yet installed or
+live-validated against a real Kismet instance**; see "Known limitations"
+below.
+
+- `gateway/src/sigedge_client.py`: `SigedgeNode` gained optional
+  `kismet_host`/`kismet_port` fields and a `kismet_enabled` property. New
+  `KismetClient` class — a genuinely different integration shape from
+  `SigedgeClient`'s KA9Q multicast side: a real per-request HTTP call
+  against Kismet's own REST API. Auth was verified against Kismet's
+  current docs (<https://www.kismetwireless.net/docs/api/login/>) rather
+  than assumed, resolving `KISMET-BRIDGE.md`'s open question in favor of a
+  `readonly`-role API key (sent as the `KISMET` cookie) over HTTP Basic
+  Auth — no session-cookie lifecycle needed for stateless per-request
+  gateway calls. Exact device field paths and the POST body shape were
+  sourced from Kismet's docs and the reference `python-kismet-rest`
+  client, not validated against a live Kismet instance — flagged in the
+  client's own comment as the one real unverified piece, the same posture
+  `occupancy_db.py`'s `FREQUENCY_BIN_HZ` comment already takes toward its
+  own open question.
+- `gateway/src/sigedge_gateway.py`: new
+  `SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON` env var (node_id -> API key,
+  parallel to `SIGLIERE_GATEWAY_TOKENS_JSON`), new curated
+  `GET /kismet/summary/{node_id}` and `GET /kismet/devices/{node_id}`
+  endpoints (analyst role), and `kismet_enabled` added to `/nodes`'
+  per-node response so the producer can discover which nodes to poll
+  without guessing. A node with no `kismet_host` set 409s from both new
+  endpoints; an unknown `node_id` still 404s.
+- `kismet_bridge/kismet_bridge_schema.sql` + `kismet_bridge_db.py`: a new,
+  deliberately separate device-centric schema — a single `devices` table
+  keyed on `(node_id, mac)`, upserted per poll, not an event log like
+  occupancy's `signals`/`sightings` split. A WiFi/BT device has a durable
+  MAC address, which is exactly the identity RF signals lack — the reason
+  occupancy needed frequency-binning in the first place.
+- `kismet_bridge/kismet_bridge_producer.py`: matches
+  `occupancy_producer.py`'s shape (`argparse` + `requests`, same analyst
+  token file, `--once`/continuous/`--node`). Discovers Kismet-enabled
+  nodes via the gateway's `/nodes` when `--node` isn't given. Default
+  poll interval is 60s — meaningfully shorter than sovereign-sigint's
+  15-minute file-staging cadence, since the gateway's live HTTP call per
+  poll has no file-copy race to design around, but still an unvalidated
+  placeholder.
+- `openwebui-tools/kismet_tool.py`: self-contained native tool
+  (`query_wifi_devices`, `kismet_summary`), matching every other optional
+  tool's no-repo-import pattern. Updated the "three AI sources" comment
+  block in both `occupancy_tool.py` and `sigid_reference_tool.py` to point
+  at it.
+- `scripts/install-kismet-bridge.sh` / `validate-kismet-bridge.sh`,
+  `systemd/kismet-bridge.service`: installer/validator pair and a
+  persistent `systemd --user` service, mirroring occupancy's pair
+  exactly. Wired into `scripts/setup-venvs.sh` (new `kismet-bridge` venv
+  domain) and `scripts/install-corpus-dirs.sh` (new `/data/kismet-bridge`
+  directory).
+- 18 new unit tests (`tests/test_kismet_client.py`,
+  `tests/test_kismet_bridge_db.py`, `tests/test_kismet_bridge_producer.py`)
+  covering `KismetClient` auth/credential errors and summary aggregation,
+  device upsert/query behavior including same-MAC-different-node rows, and
+  producer node discovery/poll behavior — all against faked HTTP responses,
+  no live network or Kismet calls. Also smoke-tested the actual FastAPI
+  app (in an ad hoc venv with `fastapi`/`httpx` installed, not part of the
+  repo's own test suite) via `TestClient`: `/nodes` reports
+  `kismet_enabled` correctly, `/kismet/summary/{node_id}` 409s for a node
+  without `kismet_host`, and 404s for an unknown `node_id`.
+- Docs: new `docs/kismet-bridge-guide.md` (mirrors
+  `docs/occupancy-guide.md`'s structure); updated `docs/architecture.md`,
+  `docs/optional-tools.md`, `docs/data-layout.md`, `docs/venvs.md`,
+  `docs/operations.md` (credential rotation section), `docs/README.md`,
+  `gateway/README.md`, `INSTALL.md`, and the root `README.md`'s repository
+  layout.
+
 ## Known limitations and follow-up
 
 - Repository checks cannot replace live validation against the target SIGedge
@@ -244,6 +327,16 @@ see "Known limitations" below.
   added" above). `scripts/install-occupancy.sh` / `validate-occupancy.sh`
   still need a real run on rubberduck before this capability can be called
   live-verified, the same bar the gateway itself already cleared above.
+- The Kismet bridge (`kismet_bridge/`, `kismet-bridge.service`) has never
+  been exercised against a real Kismet instance — see "Kismet bridge
+  capability added" above. Three specific things need live confirmation
+  before this can be called production-ready: (1) `KismetClient`'s exact
+  REST field paths and POST body shape, sourced from docs/reference-client
+  code rather than a live Kismet response; (2) that no SIGedge node in
+  `gateway/config/nodes.json` yet has `kismet_host`/`kismet_port` set or a
+  matching `SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON` entry — an operator
+  step, not a code gap; (3) the 60-second poll interval, an unvalidated
+  placeholder like occupancy's `FREQUENCY_BIN_HZ`.
 
 ## Verification baseline
 
@@ -305,3 +398,26 @@ or service run:
   `scripts/validate-occupancy.sh`: completed successfully.
 - Not run: `scripts/install-occupancy.sh` / `validate-occupancy.sh`
   themselves against the live rubberduck gateway — see "Known limitations."
+
+Verification performed on 2026-09-09 (Kismet bridge capability added, see
+"Kismet bridge capability added" above) — repository checks only, no live
+host, Kismet instance, or service run:
+
+- `python3 -m unittest discover -s tests -v`: 39 tests passed (18 new).
+- `python3 -m py_compile` on `gateway/src/sigedge_client.py`,
+  `gateway/src/sigedge_gateway.py`, `kismet_bridge/kismet_bridge_db.py`,
+  `kismet_bridge/kismet_bridge_producer.py`, and
+  `openwebui-tools/kismet_tool.py`: completed successfully.
+- `bash -n` on `scripts/install-kismet-bridge.sh` and
+  `scripts/validate-kismet-bridge.sh`: completed successfully.
+- `python3 -m json.tool gateway/config/nodes.json`: still valid (file
+  itself unchanged — no real Kismet host/port was fabricated into it; see
+  gateway/README.md's documented example instead).
+- Additional smoke test beyond the repo's own suite: the FastAPI app
+  imported and served requests correctly in an ad hoc venv with
+  `fastapi`/`httpx` installed (`/nodes` includes `kismet_enabled`;
+  `/kismet/summary/{node_id}` returns 409 for a node without
+  `kismet_host` and 404 for an unknown `node_id`).
+- Not run: `scripts/install-kismet-bridge.sh` /
+  `validate-kismet-bridge.sh` themselves, and no call was made against a
+  real Kismet REST API — see "Known limitations."

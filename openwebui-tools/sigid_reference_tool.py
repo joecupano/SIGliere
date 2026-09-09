@@ -11,7 +11,7 @@ license: AGPL-3.0
 #
 # THE THIRD AI SOURCE — reference, not observation:
 #   occupancy = what frequencies are active (our own capture)
-#   kismet    = what WiFi devices are present (our own capture)
+#   kismet    = what devices are present (our own capture — see kismet_tool.py)
 #   sigid     = what signals ARE — the reference catalog to identify them
 #
 #   This mirrors the occupancy/kismet native-tool pattern, but the SigID data

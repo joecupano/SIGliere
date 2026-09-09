@@ -17,3 +17,29 @@ The gateway installs in dry-run mode by default.
 SIGedge must publish its status and channel multicast with a TTL that reaches
 the SIGliere host. `ttl=0` is host-local and cannot support a remote tier.
 
+## Kismet bridge
+
+A node that also runs Kismet (device/protocol presence — WiFi, Bluetooth,
+ISM-band — see the project root's `KISMET-BRIDGE.md`) declares two extra,
+optional fields in its `nodes.json` entry — a node without them simply has
+no Kismet capability:
+
+```json
+{
+  "node_id": "sigedge-vhf-uhf",
+  "kismet_host": "192.0.2.10",
+  "kismet_port": 2501
+}
+```
+
+This is, deliberately, the same category of fact `status_address` and
+`data_address` already are: a network address+port, never a host path,
+systemd unit, or device profile. Unlike KA9Q status, Kismet's REST API
+requires authentication — see `gateway.env.example`'s
+`SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON` for how per-node API keys are
+supplied. `GET /kismet/summary/{node_id}` and `GET /kismet/devices/{node_id}`
+(analyst role) are curated endpoints, not a raw Kismet REST proxy — each
+makes a live HTTP call to that node's Kismet instance per request, unlike
+`/status`'s passively-aggregated multicast subscription. A node with no
+Kismet fields set returns 409 from both.
+

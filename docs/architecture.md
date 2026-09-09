@@ -96,6 +96,16 @@ or have deliberate multicast routing. SIGedge must use a nonzero multicast TTL
 and the correct egress interface. Switch IGMP snooping and firewall policy must
 be tested with live status discovery.
 
+A node that also runs Kismet declares an additional, optional
+`kismet_host`/`kismet_port` in `nodes.json` — a routable address+port, the
+same category of fact `status_address`/`data_address` already are. Unlike
+KA9Q status, this is a real per-request HTTP call to Kismet's own REST API
+(curated by the gateway into `/kismet/summary/{node_id}` and
+`/kismet/devices/{node_id}`, not proxied raw), authenticated with a
+per-node API key from `SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON`. See
+[gateway/README.md](../gateway/README.md#kismet-bridge) and
+[kismet-bridge-guide.md](kismet-bridge-guide.md).
+
 ## Host topology
 
 ```text

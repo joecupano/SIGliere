@@ -140,6 +140,19 @@ This lets an operator ask natural-language questions ("what happened near sensor
 X last night") instead of writing queries by hand. Keep this tier strictly
 read-only — see §3.
 
+The tool-function restriction (§3) is a code-level guarantee; it doesn't by
+itself make the model's *answers* follow the tradecraft conventions in §1. Give
+this tier an explicit system prompt that encodes them, at minimum:
+- Report in BLUF form — lead with tier counts/notable correlations, details after.
+- Treat "unknown" as a volume/pattern signal, not an identity claim, for
+  identifier types that rotate/randomize (§2.5); only treat it as evidence of
+  an unrecognized entity for stable identifier types.
+- Never state or imply a bearing/position the deployment can't actually produce
+  — for single-site deployments, that's anything beyond presence/absence within
+  range (§2.1).
+- Decline to recommend or narrate a real-world response/action — that decision
+  belongs to whoever owns the external action boundary (§2.7), not to this tier.
+
 ### 2.7 External action boundary
 
 **The event store (or a specific tier threshold within it) is the integration
@@ -212,7 +225,37 @@ When instantiating this workflow for an actual system, resolve:
       and who/what owns building that separate consumer?
 - [ ] What's the review/maintenance cadence, and who owns it?
 
-## 6. Worked example (reference only)
+## 6. AI-assisted operator tooling
+
+This is distinct from §2.6's embedded AI tool-calling tier. §2.6 is the
+always-on pipeline talking to itself (or answering ad hoc operator questions)
+and must stay read-only per §3. This section is AI assistance a human operator
+drives turn-by-turn to build and run the system — a different trust boundary,
+because a person is in the loop for every action taken, not the unattended
+pipeline. Don't conflate the two: tooling described here may reasonably read
+*and write* (e.g. update the known-identifier library, file a report); the
+embedded tier in §2.6 may not.
+
+Three ways to leverage this, generalizing beyond any one coding assistant:
+
+- **Agents** for the judgment-call tasks in §4's SOP. E.g. an "EOB reviewer"
+  agent that pulls recurring "unknown" hits from the event store and *proposes*
+  enroll-as-known vs. leave-flagged decisions with its reasoning — the operator
+  still makes and applies the actual call (§4, "known-identifier library
+  maintenance"). Scope each agent to one recurring decision rather than
+  building a general-purpose operator agent, so its proposals stay auditable.
+- **Skill packages** (e.g. Claude Code `SKILL.md` files) for the repeatable
+  procedural steps in §4: shakedown-period threshold calibration, the weekly
+  known-identifier review, and BLUF report generation. This turns the SOP from
+  prose an operator has to remember into something they actually invoke
+  consistently, and gives new operators a runnable version of the checklist in
+  §5 rather than just documentation.
+- **System prompts** for §2.6's embedded tier — see the addition in §2.6 above.
+  Worth listing here too because it's the same underlying idea (steering an AI
+  component with explicit, written conventions) applied to the pipeline's own
+  tier rather than to operator-facing tooling.
+
+## 7. Worked example (reference only)
 
 A property-perimeter trespasser-detection instantiation of this workflow —
 single 30 ft mast, splitter-fed SDRs for cellular presence/Bluetooth/LoRa/APRS,

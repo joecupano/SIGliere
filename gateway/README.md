@@ -19,14 +19,15 @@ the SIGliere host. `ttl=0` is host-local and cannot support a remote tier.
 
 ## Kismet bridge
 
-A node that also runs Kismet (device/protocol presence — WiFi, Bluetooth,
-ISM-band — see the project root's `KISMET-BRIDGE.md`) declares two extra,
-optional fields in its `nodes.json` entry — a node without them simply has
-no Kismet capability:
+A Kismet server (device/protocol presence — WiFi, Bluetooth, ADS-B — see
+the project root's `KISMET-BRIDGE.md`) is a standalone package, unrelated to
+radiod. It is declared in `nodes.json` with `kismet_host`/`kismet_port` and
+no radiod fields; a node without them has no Kismet capability, and a
+Kismet-only node is skipped by `/status` and rejected by `/tune`:
 
 ```json
 {
-  "node_id": "sigedge-vhf-uhf",
+  "node_id": "kismet-edge",
   "kismet_host": "192.0.2.10",
   "kismet_port": 2501
 }

@@ -15,8 +15,9 @@ Occupancy ([occupancy-guide.md](occupancy-guide.md)) answers "was this
 frequency in use." The SigID reference
 ([optional-tools.md](optional-tools.md#sigid-reference)) answers "what is
 this signal." The Kismet bridge answers a third, distinct question: **what
-WiFi, Bluetooth, or ISM-band devices has SIGedge's Kismet capture actually
-seen, and when.**
+WiFi, Bluetooth, or ADS-B devices has a Kismet server actually seen, and
+when.** Kismet is a standalone package (not part of SIGedge) running on its
+own host.
 
 ## Why This Isn't a Direct Port of sovereign-sigint's Design
 
@@ -26,10 +27,9 @@ reads it directly, read-only, from inside the same container on the same
 box. That doesn't transfer here for the same reason occupancy's port
 didn't transfer directly either — [architecture.md](architecture.md) is
 explicit that SIGliere must not mount collection databases or capture
-directories, read SIGedge configuration, invoke its systemd units, or
-assume SIGedge is on the same host. There is no `.kismet` file to mount,
-because SIGliere is never allowed to reach for it. The one lawful window
-into SIGedge is the authenticated gateway
+directories, or invoke remote systemd units. Kismet runs on another host,
+so there is no `.kismet` file to mount. The one lawful window to a remote
+host is the authenticated gateway
 (`gateway/src/sigedge_gateway.py`) — everything here goes through it, the
 same as `occupancy_producer.py` already does for `radiod` status.
 
@@ -108,12 +108,17 @@ uses, not a weekly-refresh timer.
 
 ## Honest Current Limitations
 
-- **Kismet's exact REST field paths and POST body shape were sourced from
-  Kismet's own docs and the reference `python-kismet-rest` client, not
-  validated against a live instance during this build** — see
-  `sigedge_client.py`'s `KismetClient` comment. Confirm against the
-  specific Kismet version SIGedge runs (`kismet_site.conf`) before relying
-  on this in production.
+- **Validated against one Kismet version only.** The REST paths, POST body,
+  and `readonly` API-key cookie were checked live on 2026-10-06 against
+  Kismet 2025.09.0 (see `sigedge_client.py`'s `KismetClient` comment). Other
+  Kismet versions may differ.
+- **ADS-B dominates the mirror.** Aircraft are ~88% of devices, so
+  `query_wifi_devices` excludes PHY `ADSB` by default; pass `phy="ADSB"` or
+  `include_adsb=true` to include them. `kismet_summary` always reports
+  `adsb_count` separately.
+- **Journal mode is rollback, not WAL.** The Open WebUI container mounts the
+  mirror read-only, and a WAL database cannot be opened from a read-only
+  mount once the writer closes it.
 - **The 60-second poll interval is an unvalidated placeholder**, same
   posture as occupancy's `FREQUENCY_BIN_HZ` — chosen as "meaningfully
   shorter than the file-staging cadence this replaces," not measured

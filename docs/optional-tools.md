@@ -134,8 +134,8 @@ the gateway already installed (`./scripts/install-sigedge-gateway.sh`).
 
 ## Kismet Bridge
 
-Mirrors which WiFi, Bluetooth, and ISM-band devices SIGedge's Kismet
-capture has seen — device presence, not frequency activity (that's
+Mirrors which WiFi, Bluetooth, and ADS-B devices a standalone Kismet
+server has seen — device presence, not frequency activity (that's
 Occupancy, above) and not signal identification (that's SigID Reference).
 See [kismet-bridge-guide.md](kismet-bridge-guide.md) for the full design,
 including why it's a gateway poller rather than a mounted `.kismet` file.

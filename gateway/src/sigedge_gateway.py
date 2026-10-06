@@ -51,15 +51,19 @@ class GatewayState:
             node = SigedgeNode(
                 node_id=item["node_id"],
                 label=item.get("label", item["node_id"]),
-                status_address=item["status_address"],
-                min_hz=float(item["min_hz"]),
-                max_hz=float(item["max_hz"]),
-                modes=tuple(str(mode).lower() for mode in item["modes"]),
+                status_address=item.get("status_address"),
+                min_hz=float(item.get("min_hz", 0)),
+                max_hz=float(item.get("max_hz", 0)),
+                modes=tuple(str(mode).lower() for mode in item.get("modes", [])),
                 control_enabled=bool(item.get("control_enabled", False)),
                 data_address=item.get("data_address"),
                 kismet_host=item.get("kismet_host"),
                 kismet_port=item.get("kismet_port"),
             )
+            if not (node.radiod_enabled or node.kismet_enabled):
+                raise RuntimeError(
+                    f"{node.node_id} needs status_address (radiod) or kismet_host"
+                )
             if node.node_id in nodes:
                 raise RuntimeError(f"duplicate node_id: {node.node_id}")
             nodes[node.node_id] = node
@@ -106,6 +110,7 @@ def public_node(node: SigedgeNode) -> dict[str, Any]:
         "max_hz": node.max_hz,
         "modes": list(node.modes),
         "control_enabled": node.control_enabled,
+        "radiod_enabled": node.radiod_enabled,
         "kismet_enabled": node.kismet_enabled,
     }
 
@@ -128,6 +133,8 @@ def nodes(_: Annotated[str, Depends(analyst)]) -> dict[str, Any]:
 def all_status(_: Annotated[str, Depends(analyst)]) -> dict[str, Any]:
     results = []
     for node in state.nodes.values():
+        if not node.radiod_enabled:
+            continue
         try:
             results.append(state.client.status(node))
         except Exception as exc:
@@ -144,6 +151,8 @@ def node_status(node_id: str, _: Annotated[str, Depends(analyst)]) -> dict[str, 
     node = state.nodes.get(node_id)
     if node is None:
         raise HTTPException(status_code=404, detail="unknown node_id")
+    if not node.radiod_enabled:
+        raise HTTPException(status_code=409, detail=f"{node_id} has no radiod configured")
     try:
         return state.client.status(node)
     except Exception as exc:

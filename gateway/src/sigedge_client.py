@@ -15,23 +15,28 @@ except Exception:  # pragma: no cover - exercised by deployment preflight
 class SigedgeNode:
     node_id: str
     label: str
-    status_address: str
-    min_hz: float
-    max_hz: float
-    modes: tuple[str, ...]
+    # radiod fields are optional: a Kismet-only node (Kismet is a standalone
+    # package, unrelated to radiod/SIGedge) omits them all.
+    status_address: str | None = None
+    min_hz: float = 0.0
+    max_hz: float = 0.0
+    modes: tuple[str, ...] = ()
     control_enabled: bool = False
     data_address: str | None = None
-    # Optional — not every SIGedge node runs Kismet (a node might be
-    # radiod-only). Present only for nodes that do, per nodes.json's own
-    # "no host path/systemd unit/device profile" discipline: this is a
-    # network address+port, the same category of fact status_address and
-    # data_address already are.
+    # Optional — Kismet is a standalone package, independent of radiod. A
+    # node may have either or both. Per nodes.json's "no host
+    # path/systemd unit/device profile" discipline, this is a network
+    # address+port, the same category of fact status_address already is.
     kismet_host: str | None = None
     kismet_port: int | None = None
 
     @property
     def kismet_enabled(self) -> bool:
         return self.kismet_host is not None
+
+    @property
+    def radiod_enabled(self) -> bool:
+        return self.status_address is not None
 
 
 def _jsonable(value: Any) -> Any:
@@ -63,6 +68,8 @@ class SigedgeClient:
         return ka9q
 
     def status(self, node: SigedgeNode) -> dict[str, Any]:
+        if not node.radiod_enabled:
+            raise RuntimeError(f"{node.node_id} has no radiod status_address configured")
         sdk = self._require_ka9q()
         if not hasattr(sdk, "discover_channels_native"):
             raise RuntimeError("ka9q-python lacks discover_channels_native")
@@ -117,6 +124,8 @@ class SigedgeClient:
         return channels
 
     def tune(self, node: SigedgeNode, *, frequency_hz: float, mode: str) -> dict[str, Any]:
+        if not node.radiod_enabled:
+            raise RuntimeError(f"{node.node_id} has no radiod to control")
         if not node.control_enabled:
             raise RuntimeError(f"control is disabled for {node.node_id}")
         mode = mode.lower().strip()
@@ -198,11 +207,9 @@ class SigedgeClient:
 # Field paths and endpoint shapes below (POST with a form-encoded "json"
 # field carrying the field-simplification spec, not a raw JSON body) are
 # sourced from Kismet's own REST docs and the reference
-# https://github.com/kismetwireless/python-kismet-rest client, not
-# discovered against a live instance during this build — validate against
-# the actual Kismet version SIGedge runs (kismet_site.conf) before relying
-# on this in production, same as every other real-but-unverified item this
-# feature flags rather than guesses past.
+# https://github.com/kismetwireless/python-kismet-rest client, and were
+# validated live on 2026-10-06 against Kismet 2025.09.0 (readonly API key,
+# devices/last-time/0/devices.json). Other Kismet versions are unverified.
 class KismetClient:
     """Kismet REST API client — curated, not a raw proxy."""
 

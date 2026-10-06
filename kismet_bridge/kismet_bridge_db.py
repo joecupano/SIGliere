@@ -41,13 +41,14 @@ class KismetBridgeDB:
 
     @contextmanager
     def _connect(self):
-        # See occupancy_db.py's identical pattern: timeout= for a blocked
-        # writer, WAL so occupancy_tool-style readers never block the
-        # producer's writes.
+        # timeout= for a blocked writer. Deliberately NOT WAL: the Open WebUI
+        # container mounts this directory read-only, and a WAL database
+        # can't be opened from a read-only mount once the writer closes it
+        # and the -wal/-shm files go away ("unable to open database file").
+        # A rollback journal has no side files for the reader to need.
         conn = sqlite3.connect(self.db_path, timeout=30.0)
         try:
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA journal_mode=DELETE")
             conn.execute("PRAGMA busy_timeout=30000")
             yield conn
             conn.commit()

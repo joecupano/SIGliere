@@ -7,13 +7,12 @@ this doc), *sigid* (the reference catalog, built) — and says plainly
 "no Kismet bridge exists in SIGliere; that capability stays SIGedge-side."
 This is what closing that gap actually requires.
 
-SIGedge's side is already done and hardware-validated: Kismet itself,
-built from source, running as a system service, capturing WiFi (a mainline
-`mt76x2u` adapter), Bluetooth (Ubertooth One, firmware-upgraded), and
-ISM-band RTL-SDR (`rtl433-sn-<serial>`, deliberately pinned against
-`radiod`'s own use of the same hardware type). See SIGedge's own
-`KISMET-CHECKLIST.md` for that full history. None of that changes here —
-this document is exclusively about the SIGliere-side consumption layer.
+Kismet is its own standalone package. It is **not** part of SIGedge (it was
+deprecated from SIGedge) and has nothing to do with `radiod`. It runs on a
+separate host (`kismet-edge`), installed per Kismet's own documentation, and
+is validated live: Kismet 2025.09.0 capturing WiFi, BTLE, and ADS-B. None of
+that changes here — this document is exclusively about the SIGliere-side
+consumption layer.
 
 ## Why This Isn't a Direct Port of sovereign-sigint's Design
 
@@ -23,13 +22,14 @@ a stable path, and a native Open WebUI tool reads that file directly,
 read-only, from inside the same container on the same box. That doesn't
 transfer here for the same reason `occupancy`'s port didn't transfer
 directly either — [architecture.md](docs/architecture.md) is explicit that
-SIGliere must not mount collection databases or capture directories, read
-SIGedge configuration, invoke its systemd units, or assume SIGedge is on
-the same host. There is no `.kismet` file to mount, because SIGliere is
-never allowed to reach for it. The one lawful window into SIGedge is the
-authenticated gateway (`gateway/src/sigedge_gateway.py`) — everything below
-has to go through it, the same as `occupancy_producer.py` already does for
-`radiod` status.
+SIGliere must not mount collection databases or capture directories, or
+invoke remote systemd units. Kismet runs on another host, so there is no
+`.kismet` file to mount. The one lawful window to any remote collection
+host is the authenticated gateway (`gateway/src/sigedge_gateway.py`) —
+everything below goes through it, the same as `occupancy_producer.py`
+already does for `radiod` status. Kismet nodes in `nodes.json` are
+Kismet-only: they declare `kismet_host`/`kismet_port` and none of the radiod
+fields.
 
 **The gateway today has zero Kismet awareness.** It's built specifically
 around `ka9q-python` and KA9Q status/control multicast for `radiod` —
@@ -72,9 +72,9 @@ one: Kismet has no multicast status protocol to listen to.
 Needs new per-node config in `nodes.json` — network address and port
 reachable over the LAN/routed network (not a host path, systemd unit, or
 device profile, so it doesn't cross the same line `nodes.json`'s existing
-fields already avoid), plus a credential reference. Since not every
-SIGedge node necessarily runs Kismet (a node might be `radiod`-only), this
-should be an optional per-node field, not a change to every existing entry.
+fields already avoid), plus a credential reference. Kismet and radiod
+are independent, so every field of either kind is optional per node; a node
+needs at least one of `status_address` (radiod) or `kismet_host` (Kismet).
 
 ### 2. Credential handling — new surface, occupancy never needed this
 
@@ -142,25 +142,22 @@ sources" comment block already sitting in both `occupancy_tool.py` and
 ## Open Questions To Resolve Before/While Building
 
 - Kismet REST API auth: basic auth (assumed above) vs. an API-key
-  mechanism — verify against the actual Kismet version SIGedge runs before
-  committing to a credential shape.
+  mechanism — resolved: `readonly` API key as the `KISMET` cookie, verified live
+  against Kismet 2025.09.0.
 - Exact credential storage/provisioning flow (see §2) — needs a real
   decision, not an assumption carried into `INSTALL.md`.
 - Polling cadence (see §4) — no forcing constraint anymore; pick a number
   deliberately rather than inheriting sovereign-sigint's file-staging
   interval.
-- Multi-node behavior: with more than one Kismet-capable SIGedge node,
+- Multi-node behavior: with more than one Kismet node,
   should the tool's queries default to "all nodes" or require `--node`
   explicitly, matching whatever convention `occupancy_tool.py` settled on
   for the same question.
 
-## What Stays Exactly SIGedge's Job
+## What Stays Kismet's Job
 
-Everything about Kismet itself: the systemd service, `kismet_site.conf`,
-capture-source configuration (WiFi/Bluetooth/RTL-SDR), USB device
-permissions, and the device-ownership discipline against `radiod`'s own
-hardware use (SIGedge's `README.md` and `scripts/device-inventory.sh`).
-None of it moves, none of it gets read directly by SIGliere, and this
-bridge adds no new requirement on that side beyond "Kismet's REST API is
-reachable on the network from wherever the gateway runs" — which it
-already is, on :2501, per SIGedge's own `kismet_site.conf`.
+Everything about Kismet itself: its service, configuration, capture-source
+setup (WiFi/Bluetooth/ADS-B), and USB device permissions. None of it is
+read directly by SIGliere, and this bridge adds no new requirement on that
+side beyond "Kismet's REST API is reachable on the network from wherever the
+gateway runs" (default port 2501) and one `readonly` API key.

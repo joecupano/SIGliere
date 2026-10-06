@@ -224,9 +224,9 @@ Built the third AI data source named but deliberately not built in
 `occupancy_tool.py`'s own header comment ("no Kismet bridge exists in
 SIGliere; that capability stays SIGedge-side"). Spec lived in
 `KISMET-BRIDGE.md` at the repo root; see `docs/kismet-bridge-guide.md` for
-the full design writeup. **Repository-only — not yet installed or
-live-validated against a real Kismet instance**; see "Known limitations"
-below.
+the full design writeup. **Update 2026-10-06: installed and live-validated** against a standalone
+Kismet 2025.09.0 server (`kismet-edge`, 192.168.9.74; WiFi, BTLE, ADS-B) —
+see "Kismet bridge go-live" below.
 
 - `gateway/src/sigedge_client.py`: `SigedgeNode` gained optional
   `kismet_host`/`kismet_port` fields and a `kismet_enabled` property. New
@@ -292,6 +292,30 @@ below.
   `docs/operations.md` (credential rotation section), `docs/README.md`,
   `gateway/README.md`, `INSTALL.md`, and the root `README.md`'s repository
   layout.
+
+## Kismet bridge go-live (2026-10-06)
+
+Kismet is a standalone package on its own host (`kismet-edge`), not part of
+SIGedge and unrelated to radiod. Installed gateway, bridge poller, and the
+Open WebUI tool; `validate-kismet-bridge.sh` passes.
+
+- `SigedgeNode`'s radiod fields (`status_address`, `min_hz`, `max_hz`,
+  `modes`) are now optional; a node needs `status_address` or
+  `kismet_host`. New `radiod_enabled` flag (also on `/nodes`). `/status`
+  skips Kismet-only nodes, `/status/{id}` 409s for them.
+- Kismet bridge DB uses rollback-journal mode, not WAL: the Open WebUI
+  container mounts it read-only, and a WAL DB can't be opened read-only once
+  the writer closes it.
+- `query_wifi_devices` excludes PHY `ADSB` by default (aircraft are ~88% of
+  the mirror); `include_adsb=true` or `phy="ADSB"` opts in. `kismet_summary`
+  reports `adsb_count` / `non_adsb_count`.
+- Open WebUI mounts `/data/kismet-bridge` read-only. System prompt names the
+  Kismet tool. Ollama needs `OLLAMA_CONTEXT_LENGTH=16384` (systemd drop-in)
+  or the ~6900-token native-tool request is truncated at the 4096 default and
+  the models never see the tools. Qwen3 14B calls the tools reliably; the
+  Groq 8B model often refuses.
+- Known: `occupancy_db.py` also uses WAL and will likely hit the same
+  read-only-mount failure; `list_sigedge_nodes` is defined in two tools.
 
 ## Known limitations and follow-up
 

@@ -155,5 +155,27 @@ class KismetClientSummaryTests(unittest.TestCase):
         self.assertIsNone(result["last_seen_sec"])
 
 
+class KismetOnlyNodeTests(unittest.TestCase):
+    NODE = SigedgeNode(node_id="kismet-edge", label="K", kismet_host="192.0.2.20")
+
+    def test_kismet_only_node_flags(self):
+        self.assertTrue(self.NODE.kismet_enabled)
+        self.assertFalse(self.NODE.radiod_enabled)
+
+    def test_kismet_only_node_has_no_radiod_operations(self):
+        from sigedge_client import SigedgeClient
+
+        client = SigedgeClient()
+        with self.assertRaises(RuntimeError):
+            client.status(self.NODE)
+        with self.assertRaises(RuntimeError):
+            client.tune(self.NODE, frequency_hz=1.0, mode="fm")
+
+    def test_kismet_only_node_uses_default_port(self):
+        client = KismetClient(credentials={"kismet-edge": "tok"}, session=FakeSession([]))
+        self.assertEqual(client.devices(self.NODE)["devices"], [])
+        self.assertTrue(client.session.calls[0]["url"].startswith("http://192.0.2.20:2501/"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2,7 +2,7 @@
 title: SIGINT Kismet Bridge
 author: SIGliere
 description: Query the local Kismet device mirror — which WiFi, Bluetooth,
-    and ISM-band devices SIGedge's Kismet capture has seen, and when. Native
+    and ADS-B devices a standalone Kismet server has seen, and when. Native
     in-process Open WebUI tool, read-only against the host-side
     kismet_bridge.db mirror.
 version: 1.0.0
@@ -18,8 +18,7 @@ license: AGPL-3.0
 # kismet_bridge.db is written host-side by
 # kismet_bridge/kismet_bridge_producer.py, polling the SIGedge gateway's
 # curated /kismet/summary/{node} and /kismet/devices/{node} endpoints
-# (never touching Kismet's own REST API, SIGedge configuration, or capture
-# files directly — see KISMET-BRIDGE.md). This tool only reads that
+# (never touching Kismet's own REST API or capture files directly — see KISMET-BRIDGE.md). This tool only reads that
 # SQLite file from inside the Open WebUI container, using plain sqlite3
 # rather than importing kismet_bridge_db.py — same as every other native
 # tool here, this file is self-contained so it can be pasted straight
@@ -31,8 +30,9 @@ license: AGPL-3.0
 #     Volume=/data/kismet-bridge:/data/kismet-bridge-ref:ro
 #   Then set the KISMET_BRIDGE_DB_PATH valve to
 #   /data/kismet-bridge-ref/kismet_bridge.db. (:ro is fine — the tool only
-#   reads; kismet_bridge_producer.py writes on the host, in WAL mode, so
-#   reads here don't block it.)
+#   reads; kismet_bridge_producer.py writes on the host in rollback-journal
+#   mode, not WAL — WAL can't be opened from a read-only mount between
+#   polls.)
 
 import json
 import sqlite3
@@ -43,6 +43,12 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 MAX_RESULTS = 50
+
+# ADS-B aircraft dominate a typical mirror (~88%) and update constantly, so
+# they would crowd Wi-Fi/Bluetooth devices out of the MAX_RESULTS window.
+# Excluded by default; ask for them explicitly with phy="ADSB" or
+# include_adsb=True.
+ADSB_PHY = "ADSB"
 
 
 class Tools:
@@ -62,8 +68,8 @@ class Tools:
         path = Path(self.valves.KISMET_BRIDGE_DB_PATH)
         if not path.exists():
             raise FileNotFoundError(f"{path} does not exist")
-        # Read-only URI connection: this tool never writes, and the
-        # producer may hold the file open (WAL mode) concurrently.
+        # Read-only URI connection: this tool never writes. The producer's
+        # brief write locks are waited out via the connect timeout.
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=10.0)
         conn.row_factory = sqlite3.Row
         return conn
@@ -77,21 +83,25 @@ class Tools:
         phy: Optional[str] = None,
         node_id: Optional[str] = None,
         since_minutes: Optional[int] = None,
+        include_adsb: bool = False,
     ) -> str:
         """
         List devices Kismet has seen, from the local device mirror. Despite
         the name (kept for continuity with the reference design this was
         ported from), this covers every PHY Kismet tracks — WiFi, Bluetooth,
-        and ISM-band RTL-SDR devices — not only WiFi; use the phy parameter
-        to narrow to one. Use for "what APs have we seen", "find device
-        AA:BB:CC", or "what's shown up in the last hour".
+        and ADS-B devices — not only WiFi; use the phy parameter
+        to narrow to one. ADS-B aircraft (phy "ADSB") are EXCLUDED by default
+        because they vastly outnumber everything else; set phy="ADSB" or
+        include_adsb=true to query them. Use for "what APs have we seen",
+        "find device AA:BB:CC", or "what's shown up in the last hour".
 
         :param mac: Substring match against device MAC address (e.g. "AA:BB:CC"). Omit to skip.
         :param ssid: Substring match against AP SSID (dot11 access points only). Omit to skip.
         :param device_type: Exact match against Kismet's device type (e.g. "AP", "client", "Wi-Fi Bridged"). Omit to skip.
-        :param phy: Exact match against Kismet's PHY name (e.g. "IEEE802.11", "Bluetooth", "RTL433"). Omit to skip.
+        :param phy: Exact match against Kismet's PHY name (e.g. "IEEE802.11", "BTLE", "ADSB"). Omit to skip.
         :param node_id: Restrict to devices observed by this SIGedge node_id. Omit for all nodes.
         :param since_minutes: Only include devices last seen within this many minutes.
+        :param include_adsb: Include ADS-B aircraft when phy is not given. Default false. Ignored if phy is set.
         :return: A JSON string of matching devices, or a not-found message.
         """
         clauses = []
@@ -108,6 +118,9 @@ class Tools:
         if phy is not None:
             clauses.append("phy = ?")
             params.append(phy)
+        elif not include_adsb:
+            clauses.append("(phy IS NULL OR phy != ?)")
+            params.append(ADSB_PHY)
         if node_id is not None:
             clauses.append("node_id = ?")
             params.append(node_id)
@@ -139,7 +152,8 @@ class Tools:
         breakdowns by device type and PHY, the overall time span covered, and
         which SIGedge nodes have contributed data. Use to orient before a more
         specific query_wifi_devices call, or to answer "how many devices have
-        we seen".
+        we seen". Counts include ADS-B aircraft, reported separately as
+        adsb_count so they don't swamp the Wi-Fi/Bluetooth picture.
 
         :return: A JSON string with the summary counts.
         """
@@ -161,8 +175,12 @@ class Tools:
         except Exception as e:
             return (f"Error reading kismet bridge database at "
                     f"'{self.valves.KISMET_BRIDGE_DB_PATH}': {e.__class__.__name__}: {e}.")
+        by_phy_counts = {p: c for p, c in by_phy}
         return json.dumps({
             "device_count": device_count,
+            "adsb_count": by_phy_counts.get(ADSB_PHY, 0),
+            "non_adsb_count": device_count - by_phy_counts.get(ADSB_PHY, 0),
+            "note": "query_wifi_devices excludes ADSB unless phy='ADSB' or include_adsb=true",
             "first_seen_sec": span[0],
             "last_seen_sec": span[1],
             "by_type": {t or "unknown": c for t, c in by_type},

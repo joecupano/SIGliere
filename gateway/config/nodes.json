@@ -39,6 +39,12 @@
       "max_hz": 144650000,
       "modes": ["fm"],
       "control_enabled": true
+    },
+    {
+      "node_id": "kismet-edge",
+      "label": "Kismet Edge",
+      "kismet_host": "192.168.9.74",
+      "kismet_port": 2501
     }
   ]
 }

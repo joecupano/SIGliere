@@ -47,8 +47,33 @@ MAX_RESULTS = 50
 # ADS-B aircraft dominate a typical mirror (~88%) and update constantly, so
 # they would crowd Wi-Fi/Bluetooth devices out of the MAX_RESULTS window.
 # Excluded by default; ask for them explicitly with phy="ADSB" or
-# include_adsb=True.
+# include_adsb=True. Naming a device_type (e.g. "Airplane") also opts in.
 ADSB_PHY = "ADSB"
+
+
+def _iso(sec) -> Optional[str]:
+    """Epoch seconds -> UTC ISO-8601; small models can't read raw epochs."""
+    if sec is None:
+        return None
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(sec)))
+
+
+def _slim(row: dict) -> dict:
+    """Trim a devices row to what an LLM needs: drop row ids and the raw
+    metadata blob (large, mostly redundant), render times readably, and omit
+    empty fields so results stay small enough for the model's context."""
+    out = {
+        "node_id": row["node_id"],
+        "mac": row["mac"],
+        "device_type": row["device_type"],
+        "phy": row["phy"],
+        "ssid": row["ssid"],
+        "manufacturer": row["manufacturer"],
+        "signal_dbm": row["signal_dbm"],
+        "first_seen": _iso(row["first_seen_sec"]),
+        "last_seen": _iso(row["last_seen_sec"]),
+    }
+    return {k: v for k, v in out.items() if v not in (None, "")}
 
 
 class Tools:
@@ -97,11 +122,11 @@ class Tools:
 
         :param mac: Substring match against device MAC address (e.g. "AA:BB:CC"). Omit to skip.
         :param ssid: Substring match against AP SSID (dot11 access points only). Omit to skip.
-        :param device_type: Exact match against Kismet's device type (e.g. "AP", "client", "Wi-Fi Bridged"). Omit to skip.
+        :param device_type: Kismet device type, case-insensitive (e.g. "Wi-Fi AP", "Wi-Fi Client", "Wi-Fi Bridged", "BTLE Device"). "AP" and "client" are accepted as shorthand for the Wi-Fi types. Omit to skip.
         :param phy: Exact match against Kismet's PHY name (e.g. "IEEE802.11", "BTLE", "ADSB"). Omit to skip.
         :param node_id: Restrict to devices observed by this SIGedge node_id. Omit for all nodes.
         :param since_minutes: Only include devices last seen within this many minutes.
-        :param include_adsb: Include ADS-B aircraft when phy is not given. Default false. Ignored if phy is set.
+        :param include_adsb: Include ADS-B aircraft in an otherwise unfiltered query. Default false. Ignored if phy or device_type is set.
         :return: A JSON string of matching devices, or a not-found message.
         """
         clauses = []
@@ -113,12 +138,16 @@ class Tools:
             clauses.append("ssid LIKE ?")
             params.append(f"%{ssid}%")
         if device_type is not None:
-            clauses.append("device_type = ?")
-            params.append(device_type)
+            # Kismet's real types are "Wi-Fi AP", "Wi-Fi Client", etc.; accept
+            # the bare shorthand ("AP", "client") and any capitalization.
+            clauses.append(
+                "(LOWER(device_type) = LOWER(?) OR LOWER(device_type) = LOWER(?))"
+            )
+            params.extend([device_type, f"Wi-Fi {device_type}"])
         if phy is not None:
             clauses.append("phy = ?")
             params.append(phy)
-        elif not include_adsb:
+        elif not include_adsb and device_type is None:
             clauses.append("(phy IS NULL OR phy != ?)")
             params.append(ADSB_PHY)
         if node_id is not None:
@@ -140,10 +169,10 @@ class Tools:
                     f"'{self.valves.KISMET_BRIDGE_DB_PATH}': {e.__class__.__name__}: {e}. "
                     f"Check the valve and that the data dir is mounted in.")
 
-        hits = [dict(r) for r in rows]
-        if not hits:
+        if not rows:
             return "No devices matched those criteria in the kismet bridge database."
-        return json.dumps({"count": len(hits), "devices": hits}, indent=2)
+        hits = [_slim(dict(r)) for r in rows]
+        return json.dumps({"count": len(hits), "devices": hits}, separators=(",", ":"))
 
     # -- tool 2: quick database-wide summary --------------------------------
     def kismet_summary(self) -> str:
@@ -181,8 +210,8 @@ class Tools:
             "adsb_count": by_phy_counts.get(ADSB_PHY, 0),
             "non_adsb_count": device_count - by_phy_counts.get(ADSB_PHY, 0),
             "note": "query_wifi_devices excludes ADSB unless phy='ADSB' or include_adsb=true",
-            "first_seen_sec": span[0],
-            "last_seen_sec": span[1],
+            "first_seen": _iso(span[0]),
+            "last_seen": _iso(span[1]),
             "by_type": {t or "unknown": c for t, c in by_type},
             "by_phy": {p or "unknown": c for p, c in by_phy},
             "nodes": [n[0] for n in nodes],

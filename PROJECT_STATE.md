@@ -309,6 +309,11 @@ Open WebUI tool; `validate-kismet-bridge.sh` passes.
 - `query_wifi_devices` excludes PHY `ADSB` by default (aircraft are ~88% of
   the mirror); `include_adsb=true` or `phy="ADSB"` opts in. `kismet_summary`
   reports `adsb_count` / `non_adsb_count`.
+  `device_type` matching is case-insensitive and accepts `AP`/`client` as
+  shorthand for `Wi-Fi AP`/`Wi-Fi Client` (a model passing the bare `AP`
+  got zero results against Kismet's real type names). Naming a device_type
+  also opts out of the ADS-B default exclusion. Results are slimmed (no row
+  ids or metadata blob, ISO timestamps instead of epochs, compact JSON).
 - Open WebUI mounts `/data/kismet-bridge` read-only. System prompt names the
   Kismet tool. Ollama needs `OLLAMA_CONTEXT_LENGTH=16384` (systemd drop-in)
   or the ~6900-token native-tool request is truncated at the 4096 default and

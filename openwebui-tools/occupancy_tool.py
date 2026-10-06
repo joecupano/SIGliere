@@ -28,7 +28,8 @@ license: AGPL-3.0
 #     Volume=/data/occupancy:/data/occupancy-ref:ro
 #   Then set the OCCUPANCY_DB_PATH valve to /data/occupancy-ref/occupancy.db.
 #   (:ro is fine — the tool only reads; occupancy_producer.py writes on the
-#   host, in WAL mode, so reads here don't block it.)
+#   host in rollback-journal mode, not WAL — WAL can't be opened from a
+#   read-only mount between writes.)
 
 import json
 import sqlite3
@@ -58,8 +59,8 @@ class Tools:
         path = Path(self.valves.OCCUPANCY_DB_PATH)
         if not path.exists():
             raise FileNotFoundError(f"{path} does not exist")
-        # Read-only URI connection: this tool never writes, and the
-        # producer may hold the file open (WAL mode) concurrently.
+        # Read-only URI connection: this tool never writes. The producer's
+        # brief write locks are waited out via the connect timeout.
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=10.0)
         conn.row_factory = sqlite3.Row
         return conn

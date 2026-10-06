@@ -78,11 +78,13 @@ class OccupancyDB:
         # SIGedge node.
         conn = sqlite3.connect(self.db_path, timeout=30.0)
         try:
-            # WAL: readers (occupancy_tool.py, ad hoc queries) and the
-            # writer proceed concurrently without blocking each other.
-            # Set once per connection; harmless if already in WAL.
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA synchronous=NORMAL")  # safe with WAL, faster
+            # Rollback journal, deliberately NOT WAL: occupancy_tool.py reads
+            # this file through a read-only container mount, and a WAL
+            # database can't be opened from one once the writer closes it
+            # and the -wal/-shm side files disappear. Readers wait out the
+            # writer's brief lock via their connect timeout. Converts an
+            # existing WAL database on first connect.
+            conn.execute("PRAGMA journal_mode=DELETE")
             conn.execute("PRAGMA busy_timeout=30000")  # 30s, matches timeout=
             yield conn
             conn.commit()

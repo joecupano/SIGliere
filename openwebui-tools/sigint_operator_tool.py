@@ -66,8 +66,8 @@ class Tools:
             return f"SIGedge gateway returned {response.status_code}: {response.text}"
         return json.dumps(response.json(), indent=2)
 
-    async def list_sigedge_nodes(self, __user__: dict = {}) -> str:
-        """List SIGedge nodes available for authorized control."""
+    async def list_controllable_nodes(self, __user__: dict = {}) -> str:
+        """List SIGedge nodes available for authorized control (operator only)."""
         denied = await self._require_operator(__user__)
         if denied:
             return denied
@@ -84,7 +84,7 @@ class Tools:
         Request a SIGedge node channel at a frequency and mode. The gateway
         starts in dry-run mode; live control must be enabled separately.
 
-        :param node_id: Logical SIGedge node ID from list_sigedge_nodes.
+        :param node_id: Logical SIGedge node ID from list_controllable_nodes.
         :param frequency_hz: Requested frequency in Hz.
         :param mode: Mode allowed by the node contract.
         """

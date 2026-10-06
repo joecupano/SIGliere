@@ -314,8 +314,10 @@ Open WebUI tool; `validate-kismet-bridge.sh` passes.
   or the ~6900-token native-tool request is truncated at the 4096 default and
   the models never see the tools. Qwen3 14B calls the tools reliably; the
   Groq 8B model often refuses.
-- Known: `occupancy_db.py` also uses WAL and will likely hit the same
-  read-only-mount failure; `list_sigedge_nodes` is defined in two tools.
+- `occupancy_db.py` switched from WAL to rollback journal for the same
+  reason. The operator tool's node listing is now `list_controllable_nodes`
+  (it collided with the status tool's `list_sigedge_nodes`; re-paste it into
+  Open WebUI and re-save the models' tool selection if needed).
 
 ## Known limitations and follow-up
 

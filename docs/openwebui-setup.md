@@ -56,7 +56,7 @@ Test the model in this order:
 
 1. Call `list_sigedge_nodes` with the status tool.
 2. Call `sigedge_status`.
-3. Call `list_sigedge_nodes` with the operator tool.
+3. Call `list_controllable_nodes` with the operator tool.
 4. Request a tune while the gateway is still in dry-run mode.
 
 Keep `SIGLIERE_GATEWAY_DRY_RUN=true` until live multicast status and

@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS devices (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     node_id         TEXT NOT NULL,      -- SIGedge node_id that observed this device
     mac             TEXT NOT NULL,      -- device MAC address, as reported by Kismet
-    device_type     TEXT,               -- Kismet's kismet.device.base.type (e.g. "AP", "client", "Wi-Fi Bridged")
-    phy             TEXT,               -- Kismet PHY name (e.g. "IEEE802.11", "Bluetooth", "RTL433")
+    device_type     TEXT,               -- Kismet's kismet.device.base.type (e.g. "Wi-Fi AP", "Wi-Fi Client", "BTLE Device", "Airplane")
+    phy             TEXT,               -- Kismet PHY name (e.g. "IEEE802.11", "BTLE", "ADSB")
     ssid            TEXT,               -- nullable — only meaningful for dot11 APs
     manufacturer    TEXT,               -- OUI-derived manufacturer, nullable
     signal_dbm      REAL,               -- last observed signal strength, nullable

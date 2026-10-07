@@ -4,7 +4,7 @@ A standalone reference for the Kismet bridge capability in this build: what
 it means, why it's shaped the way it is, and how to use it. This is the
 third of the three AI data sources named in `occupancy_tool.py` and
 `sigid_reference_tool.py` — the one that was reserved but not built until
-now. The full build rationale lives in
+now. The design rationale and status live in
 [KISMET-BRIDGE.md](../KISMET-BRIDGE.md) at the repo root; this document
 covers what's built and how to use it.
 
@@ -135,8 +135,8 @@ uses, not a weekly-refresh timer.
 
 ## See Also
 
-- [KISMET-BRIDGE.md](../KISMET-BRIDGE.md) — the original build spec this
-  guide reports against
+- [KISMET-BRIDGE.md](../KISMET-BRIDGE.md) — the design rationale, decisions,
+  and status this guide reports against
 - [architecture.md](architecture.md) — the tier boundary this design
   works within
 - [gateway/README.md](../gateway/README.md#kismet-bridge) — the

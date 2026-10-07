@@ -13,7 +13,7 @@ access is sufficient — this never needs "operator").
 Real difference from occupancy_producer.py, not just a rename: there is
 no file-staging race here to inherit an interval from (sovereign-sigint's
 15-minute cadence existed specifically to safely stage a live .kismet
-SQLite file — see KISMET-BRIDGE.md's "Real opportunity, not just a port").
+SQLite file — see KISMET-BRIDGE.md's producer section).
 The gateway makes a live HTTP call to Kismet's REST API every poll, so
 there's no copy-in-progress file to avoid reading. DEFAULT_INTERVAL_SEC
 below is chosen deliberately smaller than that inherited number, but is
@@ -107,7 +107,7 @@ class KismetBridgeProducer:
         configured nodes have Kismet enabled at all, rather than trying
         every node and treating 409 as routine — mirrors occupancy's
         "default: all configured nodes" convention (see
-        KISMET-BRIDGE.md's open question on multi-node default)."""
+        KISMET-BRIDGE.md: all Kismet-enabled nodes unless --node is given)."""
         if self.nodes:
             return self.nodes
         try:

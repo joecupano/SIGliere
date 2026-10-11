@@ -114,7 +114,9 @@ placeholder, not one measured against Kismet REST load.
 
 ### 5. Native Open WebUI tool (`openwebui-tools/kismet_tool.py`)
 
-Self-contained (no repo imports, pastable into Workspace → Tools), a
+Self-contained once built (no repo imports, pastable into Workspace → Tools;
+the logic lives in `sigliere_core/kismet.py` and is inlined by
+`scripts/build-owui-tools.py`, see `docs/tool-development.md`), a
 `KISMET_BRIDGE_DB_PATH` valve for the in-container path
 (`/data/kismet-bridge-ref/kismet_bridge.db`), plain `sqlite3` with a
 read-only URI connection, and a `MAX_RESULTS = 50` cap. Two tools, named for

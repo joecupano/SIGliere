@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-09-09
+Last updated: 2026-10-11
 
 SIGliere is the sovereign cognition tier for a SIGINT deployment. The current
 repository implements the tiered design: SIGliere owns model execution, the
@@ -21,7 +21,9 @@ particular host has been installed or has passed live multicast validation.
 - SIGliere does not read SIGedge configuration, systemd state, device profiles,
   capture databases, or collection files.
 - Open WebUI integrates through native Python tools; there is no parallel MCP
-  or external OpenAPI query path.
+  or external OpenAPI query path. (An MCP server has been evaluated and is a
+  possible future step — see "sigliere_core refactor" below — but is not
+  built and the rule stands.)
 - Gateway access uses separate analyst and operator bearer tokens. Operator
   calls also check Open WebUI group membership, and control starts in dry-run.
 
@@ -324,6 +326,49 @@ Open WebUI tool; `validate-kismet-bridge.sh` passes.
   (it collided with the status tool's `list_sigedge_nodes`; re-paste it into
   Open WebUI and re-save the models' tool selection if needed).
 
+## sigliere_core refactor and `dungeon` deployment (2026-10-10 to 2026-10-11)
+
+Branch `sigliere_core` ("Option A"); an MCP server ("Option B") was discussed
+and deliberately deferred until Option A was proven.
+
+- **Shared core.** `sigliere_core/` (standard library only) now holds the
+  query/parse logic for the Kismet, occupancy, SigID, and MAC-vendor tools.
+  `openwebui-tools/src/` holds thin wrappers (LLM-facing docstrings, valves,
+  error text). `scripts/build-owui-tools.py` inlines the core into the
+  self-contained `openwebui-tools/*.py` that are pasted into Open WebUI, so
+  installation is unchanged. `--check` detects stale builds; a test enforces
+  it. The status, operator, and Whisper tools are unchanged hand-written
+  files. See `docs/tool-development.md`.
+- **No behavior change.** A 50-case before/after comparison of tool output on
+  fixtures was byte-identical (only temp-directory names differed).
+- **Open WebUI upgraded v0.11.0 -> v0.12.0**, pinned in
+  `containers/open-webui.container`. v0.12 renames the connections UI
+  (**Tools -> Integrations**; **System -> Connections** is the model
+  backends) and ships native MCP support in the backend.
+- **Data mounts moved into the main Quadlet.** The documented
+  `open-webui.container.d` drop-in was never applied on this host: Podman
+  4.9.3 ignores Quadlet drop-ins. `open-webui.container` now declares the
+  read-only mounts (Kismet bridge, occupancy, SigID, MAC vendors, audio); the
+  old drop-in was retired.
+- **Host `dungeon` (192.168.15.50).** Open WebUI v0.12.0 reinstalled with
+  `SIGLIERE_HOSTNAME=192.168.15.50`; `validate-tiered.sh` passes 7/7.
+  Updated Kismet, MAC, SigID, and occupancy tools installed; Kismet (5,500+
+  devices), MAC (58k entries), and SigID (318 signals after redirect
+  filtering) verified against real data both through Open WebUI's own tool
+  loader inside the container and by operator queries in the chat UI.
+- **Occupancy installed** (`install-occupancy.sh`, `validate-occupancy.sh`
+  pass) but records nothing: no SIGedge node is running, so the gateway
+  reports all four nodes unreachable. Not live-verified with real channels.
+- **SigID mirror ownership bug (fixed).** `install-corpus-dirs.sh` created
+  `/data/reference/sigid/{images,audio,metadata}` with `install -d`, which
+  made the parent `/data/reference/sigid` root:root; the mirror's `chmod` on
+  it then failed with `PermissionError`. The script now creates the parent
+  explicitly with the right owner. On `dungeon` the directory was repaired
+  with `chown` before the script fix.
+- Tests: 76 pass with pydantic and requests installed (4 wrapper-behavior
+  tests skip on a bare host); the generated tools also pass inside the
+  v0.12.0 image.
+
 ## Known limitations and follow-up
 
 - Repository checks cannot replace live validation against the target SIGedge
@@ -348,16 +393,17 @@ Open WebUI tool; `validate-kismet-bridge.sh` passes.
   chat RAG currently uses Open WebUI's separate Knowledge feature.
 - Automated ingest validation covers DOCX, image OCR, and spoken audio. A real
   scanned PDF still requires a manual test.
-- Unit coverage is currently narrow: gateway client contract behavior, a
-  SigID manifest fallback, and occupancy's schema/producer logic. Service,
+- Unit coverage now includes the gateway client, SigID manifest, occupancy,
+  Kismet bridge, and `sigliere_core` plus the generated tools (76 tests).
+  Service,
   authorization, multicast, and container integration are covered by
   deployment validators rather than unit tests.
-- Occupancy (`occupancy/`, `occupancy.service`) has not yet been installed
-  or exercised against the live rubberduck gateway — verified only with
-  unit tests against faked gateway responses (see "Occupancy capability
-  added" above). `scripts/install-occupancy.sh` / `validate-occupancy.sh`
-  still need a real run on rubberduck before this capability can be called
-  live-verified, the same bar the gateway itself already cleared above.
+- Occupancy (`occupancy/`, `occupancy.service`) is installed on `dungeon`
+  (2026-10-11) and passes its validator, but has never recorded a real
+  sighting: it needs a running radiod, and none is reachable. It depends
+  entirely on KA9Q channel status via the gateway; it records that a
+  demodulator channel exists, not measured RF energy. It remains
+  live-unverified until a SIGedge node is up.
 - The Kismet bridge (`kismet_bridge/`, `kismet-bridge.service`) has never
   been exercised against a real Kismet instance — see "Kismet bridge
   capability added" above. Three specific things need live confirmation
@@ -429,6 +475,20 @@ or service run:
   `scripts/validate-occupancy.sh`: completed successfully.
 - Not run: `scripts/install-occupancy.sh` / `validate-occupancy.sh`
   themselves against the live rubberduck gateway — see "Known limitations."
+
+Verification performed on dungeon on 2026-10-10/11 (see "sigliere_core
+refactor" above):
+
+- `python3 -m unittest discover -s tests`: 76 tests passed with pydantic and
+  requests available (4 skipped on a bare host); `test_owui_tools.py` also
+  passes inside `ghcr.io/open-webui/open-webui:v0.12.0`.
+- All four generated tools load through Open WebUI v0.12.0's own
+  `load_tool_module_by_id`, and the Kismet, MAC, and SigID tools were run
+  from the database copies against the mounted real data.
+- `scripts/validate-tiered.sh` (`SIGLIERE_HOSTNAME=192.168.15.50`): 7/7.
+- `scripts/validate-occupancy.sh`: passes (0 signals; no node reachable).
+- Not run: any SIGedge multicast test, or a gateway tune (dry-run remains
+  `true`).
 
 Verification performed on 2026-09-09 (Kismet bridge capability added, see
 "Kismet bridge capability added" above) — repository checks only, no live

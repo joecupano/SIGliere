@@ -86,6 +86,10 @@ sudo ./scripts/install-security-hardening.sh
 ./scripts/validate-tiered.sh
 ```
 
+`validate-tiered.sh` defaults the TLS hostname to `$(hostname -s).local`. If
+you installed with an IP-literal or other `SIGLIERE_HOSTNAME`, export the same
+value before running it, or the TLS check will report a false failure.
+
 ## 6. Open WebUI tools
 
 Follow [openwebui-setup.md](docs/openwebui-setup.md) to install the native SIGedge
@@ -132,8 +136,10 @@ least one node with `kismet_host` set and a matching API key in
 ./scripts/validate-kismet-bridge.sh
 ```
 
-Follow [optional-tools.md](docs/optional-tools.md) to add only the read-only
-Open WebUI mounts and native tools that the deployment needs. For chat RAG,
+The Open WebUI container already mounts each optional data directory
+read-only (see `containers/open-webui.container`; `install-corpus-dirs.sh`
+creates the directories). Follow [optional-tools.md](docs/optional-tools.md)
+to install the native tools that the deployment needs. For chat RAG,
 follow [rag-knowledge-base-guide.md](docs/rag-knowledge-base-guide.md); the
 standalone AI ingest output is not indexed by Open WebUI automatically.
 

@@ -86,7 +86,9 @@ exists.
 
 **Open WebUI tool** (`openwebui-tools/kismet_tool.py`) — reads
 `kismet_bridge.db` directly with plain `sqlite3` (no import of
-`kismet_bridge_db.py`; self-contained like every other native tool here).
+`kismet_bridge_db.py`). The query logic lives in `sigliere_core/kismet.py`;
+the file in `openwebui-tools/` is a generated, self-contained build (see
+[tool-development.md](tool-development.md)).
 Two tools, matching sovereign-sigint's original naming for continuity:
 `query_wifi_devices` (filterable by MAC/SSID/type/PHY/node, despite the
 name it covers every PHY Kismet tracks, not only WiFi) and

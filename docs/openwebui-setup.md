@@ -2,9 +2,14 @@
 Open WebUI is available at `https://<hostname-ip>:8443/`.
 
 ## Deployment details
-The core container has one persistent mount:
-`open-webui-state:/app/backend/data`. Collection databases, Kismet files,
-audio captures, and SDR data are not mounted because SIGedge owns them.
+The container has one read-write mount, `open-webui-state:/app/backend/data`,
+plus read-only mounts of SIGliere's own AI-tier data (the Kismet-bridge and
+occupancy mirrors, the SigID and MAC-vendor reference mirrors, and
+`/data/audio` for transcription). Collection databases, Kismet files, packet
+captures, and SDR data are never mounted because SIGedge owns them.
+
+The image is pinned in `containers/open-webui.container` (currently
+`v0.12.0`); see [operations.md](operations.md#upgrade-safely) to change it.
 
 Open WebUI binds to `127.0.0.1:8080` in the host network namespace. Its
 Ollama URL is Caddy's private route:
@@ -15,9 +20,12 @@ Native tools call the gateway through
 Caddy's loopback binding is an additional network boundary, not a replacement
 for application authorization.
 
-Optional knowledge or reference integrations should be added as explicit
-Quadlet drop-ins with the smallest necessary read-only mounts. They are not
-core installation prerequisites.
+Optional integrations get the smallest necessary read-only mounts, declared
+as `Volume=` lines in `containers/open-webui.container` itself. Quadlet
+drop-ins are not used: Podman 4.x ignores them. Podman refuses to start the
+container if a mount's source directory is missing, so run
+`install-corpus-dirs.sh` first or delete the lines for tools you do not
+install. See [optional-tools.md](optional-tools.md).
 
 When Caddy's internal CA is used, export its root certificate after first
 startup and trust it on every client:
@@ -33,7 +41,9 @@ In Open WebUI, open **Workspace → Tools**, create a tool, and paste each file:
 1. `openwebui-tools/sigedge_status_tool.py`
 2. `openwebui-tools/sigint_operator_tool.py`
 
-No external OpenAPI or MCP connection is required.
+No external OpenAPI or MCP connection is required. (Open WebUI v0.12 lists
+tool and MCP connections under **Tools → Integrations**; SIGliere does not use
+them.)
 
 Read the generated tokens from `~/.config/sigliere/gateway.env`:
 

@@ -9,6 +9,11 @@ Occupancy and the Kismet bridge are the exceptions worth flagging: their
 data comes from the live gateway (loopback-only, still host-local), not a
 mirror.
 
+The MAC, SigID, Occupancy, and Kismet tools are generated from shared logic
+in `sigliere_core/`; the files in `openwebui-tools/` are the self-contained,
+paste-ready builds. Do not edit them by hand. See
+[tool-development.md](tool-development.md).
+
 | Tool | File | Needs |
 |---|---|---|
 | MAC Vendor Lookup | `mac_lookup_tool.py` | `/data/reference/mac-vendors` mirror |
@@ -47,7 +52,7 @@ lookup API.
    service) to populate `/data/reference/mac-vendors` and install a weekly
    `systemd --user` refresh timer. Validate with
    `./scripts/validate-mac-mirror.sh`.
-2. Add the `mac-vendors` `Volume=` line from above and restart Open WebUI.
+2. Confirm the `mac-vendors` mount is active: `podman inspect open-webui --format '{{range .Mounts}}{{.Destination}} {{end}}'`.
 3. In Open WebUI, **Workspace → Tools → Create a new tool**, paste
    `openwebui-tools/mac_lookup_tool.py`.
 4. Leave the `MAC_VENDOR_DB_PATH` valve at its default
@@ -66,12 +71,12 @@ signal is*, separate from your own capture/observation data.
 1. Run `./scripts/install-sigid-mirror.sh` (rootless) to populate
    `/data/reference/sigid` and install its weekly refresh timer.
    Validate with `./scripts/validate-sigid-mirror.sh`.
-2. Add the `sigid` `Volume=` line from above and restart Open WebUI.
+2. Confirm the `sigid` mount is active: `podman inspect open-webui --format '{{range .Mounts}}{{.Destination}} {{end}}'`.
 3. **Workspace → Tools → Create a new tool**, paste
    `openwebui-tools/sigid_reference_tool.py`.
 4. Leave the `SIGID_METADATA_DIR` valve at its default
    (`/data/sigid-ref/metadata`) — it matches the mount target above.
-5. Attach to a model and test with `lookup_signal` (e.g. `"LoRa"`) and
+5. Attach to a model and test with `lookup_signal` (e.g. `"OTH Radar"`) and
    `search_signals` (by keyword, by `near_frequency_hz`, or both).
 
 ## Whisper Transcription
@@ -85,7 +90,7 @@ immediately when asked.
 1. No mirror step — `/data/audio` already exists from
    `scripts/install-corpus-dirs.sh`. Just place audio files there (`.wav`,
    `.mp3`, `.m4a`, `.flac`, `.ogg`, `.opus`).
-2. Add the `audio` `Volume=` line from above and restart Open WebUI.
+2. Confirm the `audio` mount is active: `podman inspect open-webui --format '{{range .Mounts}}{{.Destination}} {{end}}'`.
 3. **Workspace → Tools → Create a new tool**, paste
    `openwebui-tools/sigint_whisper_tool.py`. Open WebUI reads the file's
    `requirements: faster-whisper>=1.0.0` line and installs it into the
@@ -98,8 +103,9 @@ immediately when asked.
    defaults to `auto` (GPU with a clean CPU fallback).
 5. Optional: to reuse the AI ingest pipeline's downloaded model weights instead
    of a fresh in-container download, add
-   `Volume=%h/.cache/huggingface:/root/.cache/huggingface` to the same
-   drop-in file.
+   `Volume=%h/.cache/huggingface:/root/.cache/huggingface` to
+   `containers/open-webui.container` and re-run
+   `install-open-webui.sh`.
 6. Attach to a model and test with `list_audio_files` first, then
    `transcribe_audio` on one of the listed files.
 
@@ -115,7 +121,7 @@ the gateway already installed (`./scripts/install-sigedge-gateway.sh`).
    `occupancy` venv and start `occupancy.service`, a persistent poller of
    the gateway's `/status` endpoint. Validate with
    `./scripts/validate-occupancy.sh`.
-2. Add the `occupancy` `Volume=` line from above and restart Open WebUI.
+2. Confirm the `occupancy` mount is active: `podman inspect open-webui --format '{{range .Mounts}}{{.Destination}} {{end}}'`.
 3. **Workspace → Tools → Create a new tool**, paste
    `openwebui-tools/occupancy_tool.py`.
 4. Leave the `OCCUPANCY_DB_PATH` valve at its default
@@ -143,7 +149,7 @@ Requires the gateway already installed
    poller of the gateway's `/kismet/summary/{node}` and
    `/kismet/devices/{node}` endpoints. Validate with
    `./scripts/validate-kismet-bridge.sh`.
-2. Add the `kismet-bridge` `Volume=` line from above and restart Open WebUI.
+2. Confirm the `kismet-bridge` mount is active: `podman inspect open-webui --format '{{range .Mounts}}{{.Destination}} {{end}}'`.
 3. **Workspace → Tools → Create a new tool**, paste
    `openwebui-tools/kismet_tool.py`.
 4. Leave the `KISMET_BRIDGE_DB_PATH` valve at its default

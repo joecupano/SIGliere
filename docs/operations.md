@@ -78,7 +78,7 @@ Back up these items to encrypted storage:
 - `caddy-data` and `caddy-config`: the internal CA and Caddy runtime state.
 - `~/.config/sigliere/gateway.env`: gateway credentials and dry-run setting.
 - `~/.config/containers/systemd/`: installed Quadlets, Caddy configuration,
-  certificates, and optional drop-ins.
+  and certificates.
 - `/data/models`, `/data/corpus`, `/data/reference`, `/data/imagery`,
   `/data/audio`, `/data/occupancy`, and `/data/kismet-bridge`, according to
   local retention requirements.
@@ -119,13 +119,47 @@ certificate, key, and original `SIGLIERE_HOSTNAME`.
 2. Review changes to container image tags, environment files, node contracts,
    and Quadlets.
 3. Re-run the relevant installer. The gateway installer preserves an existing
-   `gateway.env`; the Open WebUI installer replaces base Quadlets but leaves
-   `.container.d` drop-ins intact.
+   `gateway.env`; the Open WebUI installer replaces the base Quadlets
+   (including the data mounts in `open-webui.container`).
 4. Reload user units, restart affected services, and run the relevant
    validators.
 5. Keep gateway control in dry-run through any gateway or KA9Q client upgrade
    until live status and authorization have been reverified.
 
-Open WebUI is pinned to the version in `containers/open-webui.container`;
-upgrading it requires an explicit repository change. Caddy follows its tagged
-container update policy.
+Caddy follows its tagged container update policy.
+
+### Upgrade Open WebUI
+
+Open WebUI is pinned to a release tag in `containers/open-webui.container`, so
+upgrading is an explicit repository change. `AutoUpdate=registry` does not
+move a pinned tag.
+
+1. Read the release notes. Open WebUI migrates its database forward on
+   startup and older versions generally cannot read the newer schema, so the
+   backup below is the only rollback path.
+2. Back up the state volume:
+   ```bash
+   systemctl --user stop open-webui.service
+   podman volume export open-webui-state -o ~/backups/open-webui-state-$(date +%F).tar
+   ```
+3. Change the `Image=` tag in `containers/open-webui.container`, then
+   `podman pull` the new image.
+4. Reinstall with the same hostname (and certificate, if one was supplied) as
+   the original install, since the Caddyfile is regenerated:
+   ```bash
+   SIGLIERE_HOSTNAME=<host-or-ip> ./scripts/install-open-webui.sh
+   ```
+5. Verify: `curl -s http://127.0.0.1:8080/api/version`, then
+   `SIGLIERE_HOSTNAME=<host-or-ip> ./scripts/validate-tiered.sh`, then run one
+   query through each native tool in the UI.
+
+To roll back, restore the old tag and import the exported volume
+(`podman volume import`) before starting the service; never import over a
+running volume.
+
+### Updating a native tool after a rebuild
+
+After changing `sigliere_core/` or `openwebui-tools/src/`, run
+`python3 scripts/build-owui-tools.py`, then re-paste the regenerated file into
+**Workspace → Tools**. Existing valve settings are kept when you edit a tool
+in place.

@@ -14,6 +14,9 @@ SIGliere stores only AI and optional reference data:
 /data/kismet-bridge              optional Kismet device-presence mirror database
 ```
 
+`containers/open-webui.container` mounts the occupancy, Kismet-bridge,
+SigID, MAC-vendor, and audio directories into Open WebUI read-only (`:ro`).
+
 Collection databases, packet captures, IQ, SigMF, and receiver recordings
 belong to SIGedge and are not part of this layout. Open WebUI's core state,
 uploads, and vector store live in the `open-webui-state` Podman volume.

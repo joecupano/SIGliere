@@ -62,6 +62,9 @@ Security and integration boundaries:
 - Open WebUI, the private router, Ollama, and the gateway are loopback-only.
 - Open WebUI reaches Ollama through `/ollama`; native tools reach the gateway
   through `/gateway`. Both use Caddy's loopback-only private router.
+- Open WebUI also holds read-only mounts of SIGliere-owned AI-tier data
+  (occupancy and Kismet-bridge mirrors, reference mirrors, audio). None are
+  SIGedge collection data.
 - There is no parallel external OpenAPI or MCP query service.
 ```
 

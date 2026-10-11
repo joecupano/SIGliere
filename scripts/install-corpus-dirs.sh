@@ -41,7 +41,10 @@ done
 # contents — /data/models, /data/corpus, etc. keep their own tighter mode
 # above regardless of /data itself being traversable.
 install -d -m 0755 -o "${OWNER%%:*}" -g "${OWNER#*:}" /data /data/reference
-for path in   /data/reference/sigid/images   /data/reference/sigid/audio   /data/reference/sigid/metadata   /data/reference/mac-vendors; do
+# Create /data/reference/sigid itself explicitly: install -d makes missing
+# parents as root:root, and the SigID mirror (running as the user) chmods this
+# directory, which fails with PermissionError if root owns it.
+for path in   /data/reference/sigid   /data/reference/sigid/images   /data/reference/sigid/audio   /data/reference/sigid/metadata   /data/reference/mac-vendors; do
   install -d -m 0755 -o "${OWNER%%:*}" -g "${OWNER#*:}" "${path}"
 done
 

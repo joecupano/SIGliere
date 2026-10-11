@@ -87,9 +87,10 @@ manual runs; the installed service runs continuously.
 
 **Open WebUI tool** (`openwebui-tools/occupancy_tool.py`) — reads
 `occupancy.db` directly with plain `sqlite3` (no import of
-`occupancy_db.py`; self-contained like every other native tool here, so it
-pastes straight into Workspace → Tools with no repo checkout inside the
-container). Three tools: `query_occupancy` (aggregate signals by
+`occupancy_db.py`). The query logic lives in `sigliere_core/occupancy.py`; the
+file in `openwebui-tools/` is a generated, self-contained build, so it pastes
+straight into Workspace → Tools with no repo checkout inside the container
+(see [tool-development.md](tool-development.md)). Three tools: `query_occupancy` (aggregate signals by
 frequency/mode/recency), `occupancy_sightings` (raw detection events for one
 signal_key), `occupancy_summary` (database-wide counts). See
 [optional-tools.md](optional-tools.md#occupancy) for deployment.

@@ -5,7 +5,7 @@ After=network-online.target
 [Container]
 # Pin to a known-good 0.11.x release so the documented workspace/model/tool
 # workflow matches the UI that the repo now describes.
-Image=ghcr.io/open-webui/open-webui:v0.11.0
+Image=ghcr.io/open-webui/open-webui:v0.12.0
 ContainerName=open-webui
 AutoUpdate=registry
 

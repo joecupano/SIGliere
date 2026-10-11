@@ -9,6 +9,7 @@
 - [Optional native tools](optional-tools.md) — MAC, SigID, Whisper, Occupancy, and Kismet bridge tools.
 - [Occupancy guide](occupancy-guide.md) — signals-heard logging design and use.
 - [Kismet bridge guide](kismet-bridge-guide.md) — device-presence mirror design and use.
+- [Developing the native tools](tool-development.md) — `sigliere_core`, generated tools, and tests.
 - [Local RAG guide](rag-knowledge-base-guide.md) — Open WebUI Knowledge workflow.
 - [Operations](operations.md) — production control, credentials, backups, and upgrades.
 - [Security](security-hardening.md) — TLS, loopback bindings, and firewall.

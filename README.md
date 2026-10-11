@@ -33,9 +33,10 @@ gateway/             Versioned SIGedge contract, KA9Q client, and gateway API
 kismet_bridge/       Optional Kismet device-presence mirror database and gateway poller
 occupancy/           Optional occupancy (signals-heard) database and gateway poller
 openwebui-prompts/    Model and system-prompt configuration
-openwebui-tools/      Native core and optional analysis tools
+openwebui-tools/      Native core and optional analysis tools (src/ = wrappers; *.py = generated)
 reference/            Optional SigID and MAC-vendor mirrors
-scripts/              Installation, validation, and security scripts
+scripts/              Installation, validation, security, and tool-build scripts
+sigliere_core/        Shared stdlib-only logic behind the data-source tools
 systemd/              User services and timers for optional capabilities
 tests/                Unit tests
 ```

@@ -20,28 +20,21 @@ mirror.
 ## Mount the data in first
 
 Each tool runs inside the Open WebUI container and only reads what's
-mounted into it. `containers/open-webui.container` doesn't mount any of
-these paths by default, and `install-open-webui.sh` overwrites that file on
-every re-run — so add the mounts as a Quadlet drop-in rather than editing
-the installed file directly:
+mounted into it. `containers/open-webui.container` mounts each data
+directory read-only (`:ro`), and `install-open-webui.sh` installs it. Podman
+refuses to start the container if a source directory is missing, so run
+`install-corpus-dirs.sh` first, or delete the `Volume=` line for any
+optional tool you are not installing.
+
+Quadlet drop-ins (`open-webui.container.d/*.conf`) are not used for these
+mounts: Podman 4.x ignores them, and on Podman 5 a duplicate mount of the same
+destination fails the container start.
+
+After changing mounts, re-run the installer so the unit is regenerated:
 
 ```bash
-mkdir -p ~/.config/containers/systemd/open-webui.container.d
-cat > ~/.config/containers/systemd/open-webui.container.d/reference-mounts.conf <<'EOF'
-[Container]
-Volume=/data/reference/mac-vendors:/data/mac-vendors-ref:ro
-Volume=/data/reference/sigid:/data/sigid-ref:ro
-Volume=/data/audio:/data/audio:ro
-Volume=/data/occupancy:/data/occupancy-ref:ro
-Volume=/data/kismet-bridge:/data/kismet-bridge-ref:ro
-EOF
-
-systemctl --user daemon-reload
-systemctl --user restart open-webui.service
+SIGLIERE_HOSTNAME=<host-or-ip> ./scripts/install-open-webui.sh
 ```
-
-Only add the `Volume=` lines for tools you're actually installing — each
-line is independent.
 
 ## MAC Vendor Lookup
 

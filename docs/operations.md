@@ -49,6 +49,16 @@ Open WebUI tool valves. The old tokens stop working after the restart. Run
 
 Never commit or paste real tokens into repository files or logs.
 
+## Rotate the MCP token
+
+`~/.config/sigliere/mcp.env` holds only `SIGLIERE_MCP_TOKEN` (the MCP server
+never holds a gateway token). To rotate it, delete the file and re-run
+`./scripts/install-sigliere-mcp.sh`, which generates a new token and restarts
+the service. Then, in Open WebUI, **Admin Panel → Settings → Integrations**,
+edit the `mcp` connection and paste the new token (the Connection ID stays
+`mcp`). The old token stops working at the restart. Run
+`./scripts/validate-sigliere-mcp.sh` and ask one MCP-backed question in chat.
+
 ## Rotate Kismet bridge API keys
 
 Per-node Kismet API keys in `SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON`
@@ -69,7 +79,7 @@ Kismet's own REST API.
 Stop the user services before a consistent backup:
 
 ```bash
-systemctl --user stop caddy.service open-webui.service sigliere-gateway.service occupancy.service kismet-bridge.service
+systemctl --user stop caddy.service open-webui.service sigliere-mcp.service sigliere-gateway.service occupancy.service kismet-bridge.service
 ```
 
 Back up these items to encrypted storage:
@@ -88,7 +98,7 @@ Inspect volume locations with `podman volume inspect` and use the host backup
 system to capture them. Restart the services afterward:
 
 ```bash
-systemctl --user start sigliere-gateway.service open-webui.service caddy.service
+systemctl --user start sigliere-gateway.service sigliere-mcp.service open-webui.service caddy.service
 ./scripts/validate-tiered.sh
 ```
 
@@ -152,7 +162,7 @@ move a pinned tag.
    ```
 5. Verify: `curl -s http://127.0.0.1:8080/api/version`, then
    `SIGLIERE_HOSTNAME=<host-or-ip> ./scripts/validate-tiered.sh`, then run one
-   query through each native tool in the UI.
+   query through each tool (native and MCP) in the UI.
 
 To roll back, restore the old tag and import the exported volume
 (`podman volume import`) before starting the service; never import over a

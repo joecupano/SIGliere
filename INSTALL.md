@@ -145,10 +145,11 @@ Caddy `/mcp` route that `install-open-webui.sh` generates:
 ./scripts/validate-sigliere-mcp.sh
 ```
 
-The Open WebUI container already mounts each optional data directory
-read-only (see `containers/open-webui.container`; `install-corpus-dirs.sh`
-creates the directories). Follow [optional-tools.md](docs/optional-tools.md)
-to install the native tools that the deployment needs. For chat RAG,
+Open WebUI mounts only `/data/audio`; the Kismet, occupancy, SigID, and
+MAC-vendor data is read by the MCP server's own read-only mounts
+(`install-corpus-dirs.sh` creates the directories). Follow
+[optional-tools.md](docs/optional-tools.md) to connect the MCP server and to
+install Whisper (and, if wanted, the native fallback tools). For chat RAG,
 follow [rag-knowledge-base-guide.md](docs/rag-knowledge-base-guide.md); the
 standalone AI ingest output is not indexed by Open WebUI automatically.
 

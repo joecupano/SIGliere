@@ -22,6 +22,14 @@ client to trust Caddy's private root CA. An operator-provided certificate is
 preferable when an existing trusted PKI is available. Private keys are copied
 with mode 0600 into `~/.config/containers/systemd/caddy-certs`.
 
+## Open WebUI egress
+
+Open WebUI defaults enable several outbound features (an OpenAI API
+connection, a GitHub version check, community sharing, code execution). The
+Quadlet turns them off for new installs; on an existing host the stored
+settings win, so follow the table in
+[openwebui-setup.md](openwebui-setup.md#recommended-open-webui-settings-for-a-sovereign-deployment).
+
 ## Gateway authorization
 
 The gateway uses separate analyst and operator bearer tokens and starts in

@@ -24,8 +24,8 @@ exclusively about the SIGliere-side consumption layer.
 Kismet REST :2501 ──► gateway (/kismet/summary, /kismet/devices)
                           ──► kismet_bridge_producer (poll every 60 s)
                                   ──► /data/kismet-bridge/kismet_bridge.db
-                                          ──► kismet_tool.py in Open WebUI
-                                              (read-only mount)
+                                          ──► sigliere-mcp (read-only mount)
+                                              ──► Open WebUI (MCP tools)
 ```
 
 ## Why This Isn't a Direct Port of sovereign-sigint's Design
@@ -94,8 +94,8 @@ resemble each other. A WiFi/BT device has a durable MAC, so the mirror is one
 not an event log. `node_id` is a column because the gateway serves multiple
 nodes.
 
-**Journal mode is rollback (`DELETE`), not WAL.** The Open WebUI container
-mounts the directory read-only, and a WAL database cannot be opened from a
+**Journal mode is rollback (`DELETE`), not WAL.** Read-only consumers (the MCP
+server, or the native Open WebUI fallback tool) mount the directory read-only, and a WAL database cannot be opened from a
 read-only mount once the writer closes it and the `-wal`/`-shm` side files
 disappear. (`occupancy_db.py` made the same change for the same reason.)
 
@@ -113,6 +113,10 @@ safely; a live REST call has no file-copy race. The number is a reasonable
 placeholder, not one measured against Kismet REST load.
 
 ### 5. Native Open WebUI tool (`openwebui-tools/kismet_tool.py`)
+
+> Since the MCP cutover the same two tools are served by the read-only MCP
+> server (`mcp_server/`, [design](docs/mcp-server-design.md)); Open WebUI no
+> longer mounts this database. The native tool below is the fallback.
 
 Self-contained once built (no repo imports, pastable into Workspace → Tools;
 the logic lives in `sigliere_core/kismet.py` and is inlined by

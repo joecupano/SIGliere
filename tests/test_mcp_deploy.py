@@ -44,6 +44,38 @@ class QuadletTests(unittest.TestCase):
         self.assertEqual(lines("Image"), ["localhost/sigliere-mcp:latest"])
 
 
+class OpenWebUiQuadletTests(unittest.TestCase):
+    """After the MCP cutover Open WebUI must not read the mirrors directly."""
+    OWUI = (REPO / "containers" / "open-webui.container").read_text()
+
+    def volumes(self):
+        return re.findall(r"^Volume=(.*)$", self.OWUI, re.M)
+
+    def test_only_state_and_audio_are_mounted(self):
+        self.assertEqual(sorted(v.split(":")[0] for v in self.volumes()),
+                         ["/data/audio", "open-webui-state"])
+
+    def test_audio_is_read_only(self):
+        audio = [v for v in self.volumes() if v.startswith("/data/audio")]
+        self.assertTrue(audio[0].endswith(":ro"))
+
+    def test_sovereign_defaults_are_off(self):
+        env = dict(re.findall(r"^Environment=(\w+)=(.*)$", self.OWUI, re.M))
+        for key in ("ENABLE_OPENAI_API", "ENABLE_VERSION_UPDATE_CHECK",
+                    "ENABLE_COMMUNITY_SHARING", "ENABLE_CODE_INTERPRETER",
+                    "ENABLE_CODE_EXECUTION", "ENABLE_WEB_SEARCH",
+                    "ENABLE_DIRECT_CONNECTIONS"):
+            self.assertEqual(env.get(key), "False", key)
+
+    def test_only_the_private_ollama_route_is_a_model_backend(self):
+        env = dict(re.findall(r"^Environment=(\w+)=(.*)$", self.OWUI, re.M))
+        self.assertEqual(env["OLLAMA_BASE_URL"], "http://127.0.0.1:8180/ollama")
+
+    def test_migrated_data_is_not_mounted(self):
+        for path in ("kismet-bridge", "occupancy", "reference/sigid", "reference/mac-vendors"):
+            self.assertNotIn(path, "\n".join(self.volumes()))
+
+
 class CaddyRouteTests(unittest.TestCase):
     def test_mcp_route_on_private_router_only(self):
         private = INSTALL_WEBUI.split("http://127.0.0.1:8180 {", 1)[1]

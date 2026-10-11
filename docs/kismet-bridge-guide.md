@@ -84,7 +84,8 @@ equivalent file-copy race to design around. Like occupancy's
 validated against real Kismet REST load — revisit once real polling data
 exists.
 
-**Open WebUI tool** (`openwebui-tools/kismet_tool.py`) — reads
+**Open WebUI tool, native fallback** (`openwebui-tools/kismet_tool.py`; the
+same tools are served to Open WebUI by the [MCP server](mcp-server-design.md)) — reads
 `kismet_bridge.db` directly with plain `sqlite3` (no import of
 `kismet_bridge_db.py`). The query logic lives in `sigliere_core/kismet.py`;
 the file in `openwebui-tools/` is a generated, self-contained build (see
@@ -143,7 +144,7 @@ uses, not a weekly-refresh timer.
   works within
 - [gateway/README.md](../gateway/README.md#kismet-bridge) — the
   `/kismet/summary` and `/kismet/devices` endpoints this producer polls
-- [optional-tools.md](optional-tools.md#kismet-bridge) — deployment as a
-  native Open WebUI tool
+- [optional-tools.md](optional-tools.md#kismet-bridge) — deployment (the MCP
+  server, or the native fallback tool)
 - `kismet_bridge/kismet_bridge_schema.sql`, `kismet_bridge/kismet_bridge_db.py`,
   `kismet_bridge/kismet_bridge_producer.py` — the implementation

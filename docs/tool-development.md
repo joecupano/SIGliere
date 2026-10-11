@@ -1,7 +1,11 @@
 # Developing the native tools
 
 Four of the Open WebUI tools (Kismet bridge, occupancy, SigID, MAC vendor)
-are built from shared logic rather than hand-maintained as single files.
+are built from shared logic rather than hand-maintained as single files. The
+same `sigliere_core` functions also back the MCP server (`mcp_server/`), which
+is now the recommended way to serve these tools; the generated single-file
+tools are kept as a fallback for one release (see
+[mcp-server-design.md](mcp-server-design.md)).
 
 ```text
 sigliere_core/            UI-agnostic query/parse logic. Standard library only.

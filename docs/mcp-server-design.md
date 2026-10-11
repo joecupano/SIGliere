@@ -1,8 +1,11 @@
-# MCP server design (proposal)
+# MCP server design
 
-Status: **design approved; Phases 0 and 1 done (server, tests, deployment on
-`dungeon`); Open WebUI connected and working; Phase 2 comparison run.** Branch `MCP-Server`. Decisions approved: the scope and security
-model below, plus recommendations 1, 2, and 3 from section 10. It follows the
+Status: **implemented and cut over on `dungeon` (2026-10-11).** Phases 0 to 3
+are done: server and tests, deployment behind Caddy, the model comparison, and
+the cutover of the Kismet, occupancy, SigID, and MAC tools to MCP (sections 12
+to 15 record the results). The only remaining item is removing the native
+fallback after one release. Branch `MCP-Server`. Decisions approved: the scope
+and security model below, plus recommendations 1, 2, and 3 from section 10. It follows the
 "Option A" work (`sigliere_core`, [tool-development.md](tool-development.md)),
 which was done first because the MCP server is a second set of thin wrappers
 over the same core.
@@ -50,8 +53,9 @@ These facts come from inspecting the pinned image, not documentation:
 | The image ships `mcp` **1.27.2**. | Pin the server to the same SDK version to avoid protocol drift. |
 | `ENABLE_TOOL_SERVERS` defaults to true; `ENABLE_DIRECT_CONNECTIONS` defaults to false. | Keep direct (browser-side) connections **off**. |
 
-Not yet verified (see section 10): exact tool-name exposure to the model,
-output-format token cost, and behavior behind the Caddy proxy.
+Items that were unverified at design time (tool-name exposure, output-format
+token cost, behavior behind Caddy) were resolved in Phases 0 to 2; see section
+10 and sections 12 to 14.
 
 ## 4. Architecture
 
@@ -137,7 +141,7 @@ analysis model.
 
 ```text
 mcp_server/                      (not `mcp/`: that name would shadow the `mcp` SDK on sys.path)
-  Containerfile                  python:3.12-slim; pip install mcp==1.27.2; copies sigliere_core   [Phase 1]
+  Containerfile                  python:3.12-slim; pip install mcp==1.27.2; copies sigliere_core
   requirements.txt
   src/sigliere_mcp/
     server.py                    FastMCP app; streamable HTTP; stateless; JSON responses
@@ -148,9 +152,9 @@ mcp_server/                      (not `mcp/`: that name would shadow the `mcp` S
       occupancy.py
       sigid.py
       mac.py
-containers/sigliere-mcp.container    [Phase 1] Quadlet, data mounts :ro, host network, 127.0.0.1:8150
-scripts/install-sigliere-mcp.sh      [Phase 1] build image, create mcp.env, install Quadlet
-scripts/validate-sigliere-mcp.sh     [Phase 1] initialize + tools/list + one call per tool
+containers/sigliere-mcp.container    Quadlet, data mounts :ro, host network, 127.0.0.1:8150
+scripts/install-sigliere-mcp.sh      build image, create mcp.env, install Quadlet
+scripts/validate-sigliere-mcp.sh     initialize + tools/list + one call per tool
 tests/test_mcp_server.py             in-process client, HTTP auth, and native-parity tests
 docs/mcp-server-design.md            this file
 ```
@@ -204,7 +208,7 @@ the native tools. Their files stay in the repository until Phase 3 is proven.
 
 ## 9. Rule amendments
 
-These documents currently forbid MCP and would change in Phase 3:
+These documents forbade MCP and were amended at cutover (done):
 
 - `docs/architecture.md` (boundaries list): replace "There is no parallel
   external OpenAPI or MCP query service." with "MCP is permitted only as the
@@ -241,6 +245,10 @@ These documents currently forbid MCP and would change in Phase 3:
 - After Phase 3, Open WebUI mounts only `/data/audio` from the data tree.
 - Documents in section 9 updated; the unit-test suite (including new MCP
   tests) passes.
+
+All criteria are met on `dungeon`, except that `validate-security-hardening.sh`
+could not be run in the test session (its firewall check needs `sudo`);
+nothing in this work changes a firewall rule.
 
 ## 12. Phase 0 results
 
@@ -348,3 +356,78 @@ follow-up call is not exercised by a one-turn test.
 Open for Phase 3: update the system prompt's tool names, re-run this
 comparison on the final prompt and on `llama3-groq-tool-use:8b`, and retire
 the native copies once results hold.
+
+### Phase 2 follow-up: second model, trimmed prompt, test-model caveat
+
+- **`llama3-groq-tool-use:8b`** makes almost no tool calls even with the native
+  tools (2 of 13 questions), and with MCP also 2 of 13. No fair comparison is
+  possible, and MCP is not the cause. This matches the earlier operational
+  note that this model often refuses to call tools. Treat it as unsuitable for
+  the tool workflow rather than as an MCP regression.
+- **Test-model caveat.** `sigint-mcp-analyst-test` has no system prompt and
+  does not set `function_calling` to native, unlike the production models
+  (`sigint-qwen`, `sigint-groq`: 1,298-character prompt, native function
+  calling). The chat tests on it therefore did not exercise the production
+  configuration. The automated runs above do (Ollama's native tool-calling
+  API), but the cutover model should be validated in chat under production
+  settings too.
+- **Trimmed prompt.** `openwebui-prompts/SIGINT-analyst-mcp.system-prompt.md`
+  moves the per-tool Kismet paragraph out of the system prompt (the tool
+  descriptions already carry it). Results with `qwen3:14b`, 13 questions x 8
+  seeds:
+
+  | Variant | Correct first tool |
+  |---|---|
+  | native tools, current prompt (production today) | 104 / 104 |
+  | MCP tools, current prompt | 104 / 104 |
+  | MCP tools, trimmed prompt | 104 / 104 acceptable (see below) |
+  | MCP tools, no system prompt | same as trimmed |
+
+  Under the trimmed prompt the model skips the old "call `kismet_summary`
+  first" step for three Kismet questions and calls `query_wifi_devices`
+  directly with correct arguments (`device_type "Wi-Fi AP"` and
+  `since_minutes 600`; `phy "ADSB"`; `phy "BTLE"`), still using
+  `kismet_summary` for "how many devices". That is the intended behavior and
+  saves a round trip; a strict "summary first" scorer counts it as a miss
+  (81 of 104), which is why the table is annotated.
+
+## 15. Phase 3 cutover status (`dungeon`)
+
+Done and verified on the live host:
+
+- Open WebUI's Quadlet no longer mounts the Kismet, occupancy, SigID, or
+  MAC-vendor data. The running container has exactly two mounts:
+  `/app/backend/data` (state) and `/data/audio` (read-only). A static test
+  (`OpenWebUiQuadletTests`) keeps it that way.
+- `validate-tiered.sh` (7 of 7) and `validate-sigliere-mcp.sh` pass after the
+  change; the MCP container is unaffected because it has its own mounts.
+- The four native data tools were deleted from Open WebUI (installed now:
+  status, operator, Whisper).
+- A production-style model, `sigint-qwen-mcp`, exists: native function calling,
+  the trimmed MCP system prompt, the MCP connection, plus the status, operator,
+  and Whisper tools.
+
+Also done:
+
+- `sigint-qwen` and `sigint-groq` were retired. The deployment now has an
+  **Analyst** model (MCP, status, Whisper; temperature 0.2; no operator tool)
+  and an **Operator** model (adds the operator tool). Both use native function
+  calling and the system prompt from
+  `openwebui-prompts/SIGINT-analyst-mcp.system-prompt.md`, and no capability
+  toggles (web search, image generation, code interpreter, terminal) are on.
+- Open WebUI's sovereign defaults were applied in the UI and in the Quadlet
+  (OpenAI API, GitHub version check, community sharing, and code execution
+  off); see `docs/openwebui-setup.md`. The OpenAI model-list refreshes that
+  were reaching `api.openai.com` stopped (0 in the following minutes, against
+  14 in five minutes before).
+- Measured Qwen3 behavior with thinking on versus off (section 14 follow-up
+  and `docs/openwebui-setup.md`): same tool-selection accuracy, about ten times
+  the latency with thinking on.
+
+Still open:
+
+- The Operator model still carries the MCP data tools. Recommended: give it
+  only the status and operator tools, so a model that reads RF-derived text
+  cannot also tune a receiver.
+- `openwebui-tools/src/` and `scripts/build-owui-tools.py` stay for one
+  release as the fallback, then are removed if unused.

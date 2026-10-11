@@ -85,7 +85,8 @@ preset (mode), and SNR/SSRC/sample-rate/multicast-address in
 `metadata_json`. `--once` runs a single poll and exits, for validation or
 manual runs; the installed service runs continuously.
 
-**Open WebUI tool** (`openwebui-tools/occupancy_tool.py`) — reads
+**Open WebUI tool, native fallback** (`openwebui-tools/occupancy_tool.py`; the
+same tools are served to Open WebUI by the [MCP server](mcp-server-design.md)) — reads
 `occupancy.db` directly with plain `sqlite3` (no import of
 `occupancy_db.py`). The query logic lives in `sigliere_core/occupancy.py`; the
 file in `openwebui-tools/` is a generated, self-contained build, so it pastes
@@ -133,8 +134,8 @@ cold.
   works within
 - [gateway/README.md](../gateway/README.md) — the `/status` endpoint this
   producer polls
-- [optional-tools.md](optional-tools.md#occupancy) — deployment as a
-  native Open WebUI tool
+- [optional-tools.md](optional-tools.md#occupancy) — deployment (the MCP
+  server, or the native fallback tool)
 - `occupancy/occupancy_schema.sql`, `occupancy/occupancy_db.py`,
   `occupancy/occupancy_producer.py` — the implementation
 - The original project's own

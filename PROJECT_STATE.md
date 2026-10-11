@@ -35,7 +35,8 @@ particular host has been installed or has passed live multicast validation.
   firewall installation scripts.
 - Validation scripts for OS packages, Ollama, security boundaries, and the
   assembled tiered service path.
-- Rootless Podman Quadlets for Caddy, Open WebUI, and the gateway.
+- Rootless Podman Quadlets for Caddy, Open WebUI, and the gateway, plus the
+  optional MCP server.
 - Mandatory HTTPS ingress with internal-CA and operator-certificate modes,
   including IP-literal deployments.
 - A versioned SIGedge node contract with explicit multicast status addresses,
@@ -52,16 +53,18 @@ particular host has been installed or has passed live multicast validation.
   under `/data/corpus/processed`.
 - Weekly local SigID and IEEE MAC-vendor mirrors, with installers, validators,
   manifests, and user timers.
-- Native Open WebUI tools for SigID lookup, MAC-vendor lookup, and on-demand
-  Whisper transcription. Their data mounts are intentionally opt-in.
+- SigID and MAC-vendor lookup and Kismet/occupancy queries, served to Open
+  WebUI by the optional read-only MCP server (`mcp_server/`); on-demand Whisper
+  transcription remains a native Open WebUI tool. Native fallback copies of
+  the four data tools are kept for one release (see "MCP server" below).
 - A local Open WebUI Knowledge/RAG workflow documented with an antenna-design
   example. This uses Open WebUI's native knowledge store, not the standalone
   ingest pipeline.
 - An occupancy service (`occupancy/`) that polls the SIGedge gateway's
   `/status` endpoint and logs actively-demodulated channels into a local
   Kismet-schema SQLite database, with an installer/validator, a persistent
-  `systemd --user` service, and a native Open WebUI query tool
-  (`occupancy_tool.py`). Ported from the sovereign-sigint project's occupancy
+  `systemd --user` service, and a query tool (MCP; native fallback
+  `occupancy_tool.py`). Ported from the sovereign-sigint project's occupancy
   design — see "Occupancy capability added" below for what changed and why.
 - A Kismet bridge (`kismet_bridge/`) — the third AI data source
   (occupancy/kismet/sigid) that was reserved but not built until now. New
@@ -69,8 +72,8 @@ particular host has been installed or has passed live multicast validation.
   `GET /kismet/devices/{node_id}`) make a curated, per-request HTTP call to
   a node's Kismet REST API, authenticated with a per-node API key
   (`SIGLIERE_GATEWAY_KISMET_CREDENTIALS_JSON`); a producer mirrors device
-  presence into a local `kismet_bridge.db`; a native Open WebUI tool
-  (`kismet_tool.py`) queries it. See "Kismet bridge capability added" below.
+  presence into a local `kismet_bridge.db`; the MCP server (native fallback
+  `kismet_tool.py`) queries it. See "Kismet bridge capability added" below.
 
 ## Deployment work that remains operator-specific
 
@@ -371,35 +374,55 @@ and deliberately deferred until Option A was proven.
 
 ## MCP server (branch `MCP-Server`, 2026-10-11)
 
-Design: `docs/mcp-server-design.md` (approved). Phase 0 (server + tests) and
-Phase 1 (deployment) are done on `dungeon`; Open WebUI is not yet connected.
+Design and results: `docs/mcp-server-design.md`. Implemented and cut over on
+`dungeon`.
 
 - `mcp_server/`: FastMCP streamable-HTTP server, stateless, nine read-only
   tools (Kismet, occupancy, SigID, MAC) over `sigliere_core`, `mcp==1.27.2`
   (the version Open WebUI ships). Bearer gate, loopback-only bind enforced in
-  config, Host-header validation.
+  config, Host-header validation. It holds no gateway credentials.
 - `containers/sigliere-mcp.container`: read-only data mounts, read-only root,
-  all capabilities dropped, no-new-privileges, no gateway credentials.
-- Caddy private router gained `/mcp` (always emitted by
-  `install-open-webui.sh`; 502 if the service is absent).
+  all capabilities dropped, no-new-privileges.
+- Caddy private router has `/mcp` (always emitted by `install-open-webui.sh`;
+  502 if the service is absent). `/mcp` on the LAN-facing 8443 reaches Open
+  WebUI, not the MCP server.
 - `scripts/install-sigliere-mcp.sh` / `validate-sigliere-mcp.sh`: validator
-  passes 20/20 on `dungeon` through the Caddy route (auth, tool list, one call
-  per tool, privileges). `/mcp` on the LAN-facing 8443 reaches Open WebUI, not
-  the MCP server.
-- Finding from Open WebUI v0.12.0's source: MCP tool names are prefixed with
-  the connection ID (`<id>_<tool>`), so they cannot collide with native tools,
-  and the server's `instructions` are injected into the system prompt.
-  Use connection ID `mcp` (not `sigliere`: see Phase 2 results in the design
-  doc). The system prompt's tool names must be updated at cutover.
-- Open WebUI was connected by the admin and works. Phase 2 (qwen3:14b) found
-  the connection ID changes tool-calling reliability: `sigliere` failed one
-  question reproducibly, `mcp`/`sig`/`local` did not. A connection created
-  with a blank ID gets a UUID prefix, which scored 72/104 (69%); the ID must
-  be set to `mcp` explicitly at creation (rename of the display name is not
-  enough). Prompt cost is +239
-  tokens (about 9.5%). Cutover (Phase 3) is not done.
+  passes 20/20 through the Caddy route (auth, tool list, one call per tool,
+  privileges). `~/.config/sigliere/mcp.env` holds only the MCP token.
+- Open WebUI connection: admin-created, type MCP, **Connection ID `mcp`** set
+  explicitly at creation, bearer auth, function filter of the nine tool names,
+  admin-only access. Tool names reach the model as `mcp_<tool>`.
+- Why the ID matters (qwen3:14b, 13 questions): `mcp`/`sig`/`local` 130/130,
+  `sigliere` 120/130 (one question never made a call), and a blank ID, which
+  generates a UUID prefix, 72/104 (69%). Editing the display name does not
+  change the ID; delete and recreate.
+- Prompt cost of MCP vs native tools: +239 tokens (about 9.5%). Tool-selection
+  accuracy was identical in a 13-question, multi-seed comparison, with and
+  without Qwen3 thinking. Thinking, which is Ollama's default unless the model
+  sets `think`, costs about ten times the latency per decision (8.3 s vs
+  0.7 s) with no accuracy gain.
+- `llama3-groq-tool-use:8b` makes almost no tool calls with either tool set
+  (2 of 13), so it is unsuitable for this workflow; `sigint-groq` was retired.
+- Cutover state on `dungeon`: Open WebUI mounts only `/data/audio`; the four
+  native data tools were deleted from the UI; models are an **Analyst**
+  (MCP, status, Whisper; temperature 0.2) and an **Operator** (adds the
+  operator tool), both with native function calling and
+  `openwebui-prompts/SIGINT-analyst-mcp.system-prompt.md`. Web search, image
+  generation, code execution, community sharing, the OpenAI API connection,
+  and the version check are off (UI and Quadlet); the OpenAI model-list
+  requests that were reaching `api.openai.com` stopped.
 
 ## Known limitations and follow-up
+
+- The Operator model still carries the MCP data tools; recommended to reduce
+  it to status plus operator so a model that reads RF-derived text cannot also
+  tune a receiver.
+- `openwebui-tools/src/` and `scripts/build-owui-tools.py` (the native
+  fallback for the four data tools) are to be removed one release after the
+  MCP cutover if unused.
+- `docs/rag-knowledge-base-guide.md` UI paths were written against Open WebUI
+  0.11 and have not been re-checked against v0.12 (which renamed some
+  settings screens).
 
 - Repository checks cannot replace live validation against the target SIGedge
   network and KA9Q services.
@@ -424,7 +447,8 @@ Phase 1 (deployment) are done on `dungeon`; Open WebUI is not yet connected.
 - Automated ingest validation covers DOCX, image OCR, and spoken audio. A real
   scanned PDF still requires a manual test.
 - Unit coverage now includes the gateway client, SigID manifest, occupancy,
-  Kismet bridge, and `sigliere_core` plus the generated tools (76 tests).
+  Kismet bridge, `sigliere_core`, the generated tools, and the MCP server plus
+  its deployment guards (111 tests).
   Service,
   authorization, multicast, and container integration are covered by
   deployment validators rather than unit tests.
@@ -446,6 +470,21 @@ Phase 1 (deployment) are done on `dungeon`; Open WebUI is not yet connected.
   placeholder like occupancy's `FREQUENCY_BIN_HZ`.
 
 ## Verification baseline
+
+Verification performed on `dungeon` on 2026-10-11 (MCP cutover, final state):
+
+- `python3 -m unittest discover -s tests`: 111 tests pass with the `mcp` SDK,
+  pydantic, and requests available (28 skipped on a bare host); the MCP tests
+  also pass inside `ghcr.io/open-webui/open-webui:v0.12.0`.
+- `scripts/validate-tiered.sh` 7/7 and `scripts/validate-sigliere-mcp.sh`
+  20/20 after the final Open WebUI reinstall; container environment shows all
+  `ENABLE_*` sovereign defaults `False`; installed Quadlet identical to the
+  repository copy.
+- Stored Open WebUI settings and model records re-read from its database: no
+  dangling tool references; all recommended settings applied.
+- Not run: `scripts/validate-security-hardening.sh` (its firewall check needs
+  `sudo`), any SIGedge multicast test, and any gateway tune (dry-run remains
+  `true`).
 
 Verification performed on 2026-09-03:
 

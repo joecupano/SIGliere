@@ -14,8 +14,9 @@ SIGliere stores only AI and optional reference data:
 /data/kismet-bridge              optional Kismet device-presence mirror database
 ```
 
-`containers/open-webui.container` mounts the occupancy, Kismet-bridge,
-SigID, MAC-vendor, and audio directories into Open WebUI read-only (`:ro`).
+Open WebUI mounts only `/data/audio` (read-only). The optional MCP server
+(`containers/sigliere-mcp.container`) mounts the occupancy, Kismet-bridge,
+SigID, and MAC-vendor directories read-only.
 
 Collection databases, packet captures, IQ, SigMF, and receiver recordings
 belong to SIGedge and are not part of this layout. Open WebUI's core state,

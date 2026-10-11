@@ -3,7 +3,8 @@
 SIGliere is the sovereign AI tier for a SIGINT deployment. It runs local
 models through Ollama, provides the operator interface through Open WebUI,
 and connects to the separate **SIGedge** collection tier through authenticated
-Python tools and KA9Q multicast services.
+Python tools and KA9Q multicast services. An optional read-only MCP server
+serves the local data mirrors to the models.
 
 SIGliere contains no SDR drivers, DSP applications, ka9q-radio installation,
 OpenWebRX+, Kismet, capture services, or collection hardware configuration.

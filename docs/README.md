@@ -6,7 +6,7 @@
 - [Data layout](data-layout.md) — AI-tier storage and collection exclusions.
 - [Python environments](venvs.md) — capability-specific virtual environments.
 - [Open WebUI setup](openwebui-setup.md) — native tools and model configuration.
-- [Optional native tools](optional-tools.md) — MAC, SigID, Whisper, Occupancy, and Kismet bridge tools.
+- [Optional tools](optional-tools.md) — the MCP server, plus Whisper and the native fallback tools for MAC, SigID, occupancy, and Kismet.
 - [Occupancy guide](occupancy-guide.md) — signals-heard logging design and use.
 - [Kismet bridge guide](kismet-bridge-guide.md) — device-presence mirror design and use.
 - [Developing the native tools](tool-development.md) — `sigliere_core`, generated tools, and tests.

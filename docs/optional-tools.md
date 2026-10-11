@@ -1,45 +1,52 @@
-# Optional native tools
+# Optional tools (MCP server and native tools)
 
 Beyond the core SIGedge Status and Operator tools ([openwebui-setup.md](openwebui-setup.md)),
-`openwebui-tools/` ships five more native tools. All five are optional —
-none are required to complete [INSTALL.md](../INSTALL.md) — and each
-uses local mirrors or files at runtime; tool calls do not leave the
-host. Initial mirror and model downloads still require network access.
-Occupancy and the Kismet bridge are the exceptions worth flagging: their
-data comes from the live gateway (loopback-only, still host-local), not a
-mirror.
+this repository provides five optional analyst capabilities: Kismet bridge,
+occupancy, SigID reference, MAC vendor lookup, and Whisper transcription. None
+are required to complete [INSTALL.md](../INSTALL.md), and each uses local
+mirrors or files at runtime; tool calls do not leave the host. Initial mirror
+and model downloads still require network access. Occupancy and the Kismet
+bridge are the exceptions worth flagging: their data comes from the live
+gateway (loopback-only, still host-local), not a mirror.
 
-The MAC, SigID, Occupancy, and Kismet tools are generated from shared logic
-in `sigliere_core/`; the files in `openwebui-tools/` are the self-contained,
-paste-ready builds. Do not edit them by hand. See
-[tool-development.md](tool-development.md).
+**Recommended path:** the Kismet, occupancy, SigID, and MAC-vendor tools are
+served by the optional [MCP server](#mcp-server-optional), which reads their
+data in its own sandboxed container. Open WebUI no longer mounts that data.
+The sections below for those four tools describe the **native-tool fallback**
+(a tool pasted into Open WebUI that reads the data directly). Using it means
+re-adding the matching `Volume=` line to `containers/open-webui.container`
+and re-running `install-open-webui.sh`, and it should not be attached to the
+same model as the MCP tools. Whisper has no MCP equivalent and stays native.
 
-| Tool | File | Needs |
-|---|---|---|
-| MAC Vendor Lookup | `mac_lookup_tool.py` | `/data/reference/mac-vendors` mirror |
-| SigID Reference | `sigid_reference_tool.py` | `/data/reference/sigid` mirror |
-| Whisper Transcription | `sigint_whisper_tool.py` | `/data/audio` (already created by `install-corpus-dirs.sh`) |
-| Occupancy | `occupancy_tool.py` | `/data/occupancy` (written by `occupancy.service`) |
-| Kismet Bridge | `kismet_tool.py` | `/data/kismet-bridge` (written by `kismet-bridge.service`) |
+The four fallback tools are generated from shared logic in `sigliere_core/`;
+the files in `openwebui-tools/` are the self-contained, paste-ready builds. Do
+not edit them by hand. See [tool-development.md](tool-development.md).
 
-## Mount the data in first
+| Tool | Native file | Data it reads | Served by |
+|---|---|---|---|
+| MAC Vendor Lookup | `mac_lookup_tool.py` | `/data/reference/mac-vendors` | MCP (fallback: native) |
+| SigID Reference | `sigid_reference_tool.py` | `/data/reference/sigid` | MCP (fallback: native) |
+| Whisper Transcription | `sigint_whisper_tool.py` | `/data/audio` (mounted in Open WebUI) | Native only |
+| Occupancy | `occupancy_tool.py` | `/data/occupancy` (written by `occupancy.service`) | MCP (fallback: native) |
+| Kismet Bridge | `kismet_tool.py` | `/data/kismet-bridge` (written by `kismet-bridge.service`) | MCP (fallback: native) |
 
-Each tool runs inside the Open WebUI container and only reads what's
-mounted into it. `containers/open-webui.container` mounts each data
-directory read-only (`:ro`), and `install-open-webui.sh` installs it. Podman
-refuses to start the container if a source directory is missing, so run
-`install-corpus-dirs.sh` first, or delete the `Volume=` line for any
-optional tool you are not installing.
+## Mounts
 
-Quadlet drop-ins (`open-webui.container.d/*.conf`) are not used for these
-mounts: Podman 4.x ignores them, and on Podman 5 a duplicate mount of the same
-destination fails the container start.
+Open WebUI mounts only `/data/audio`. Podman refuses to start a container
+whose mount source is missing, so run `install-corpus-dirs.sh` first. For a
+native fallback tool, add its line to `containers/open-webui.container` and
+re-run the installer (same `SIGLIERE_HOSTNAME`):
 
-After changing mounts, re-run the installer so the unit is regenerated:
-
-```bash
-SIGLIERE_HOSTNAME=<host-or-ip> ./scripts/install-open-webui.sh
+```ini
+Volume=/data/kismet-bridge:/data/kismet-bridge-ref:ro
+Volume=/data/occupancy:/data/occupancy-ref:ro
+Volume=/data/reference/sigid:/data/sigid-ref:ro
+Volume=/data/reference/mac-vendors:/data/mac-vendors-ref:ro
 ```
+
+Quadlet drop-ins (`open-webui.container.d/*.conf`) are not used: Podman 4.x
+ignores them, and on Podman 5 a duplicate mount of the same destination fails
+the container start.
 
 ## MAC Vendor Lookup
 
@@ -52,7 +59,7 @@ lookup API.
    service) to populate `/data/reference/mac-vendors` and install a weekly
    `systemd --user` refresh timer. Validate with
    `./scripts/validate-mac-mirror.sh`.
-2. Confirm the `mac-vendors` mount is active: `podman inspect open-webui --format '{{range .Mounts}}{{.Destination}} {{end}}'`.
+2. Fallback only: add the `mac-vendors` `Volume=` line from the Mounts section and re-run `install-open-webui.sh`.
 3. In Open WebUI, **Workspace → Tools → Create a new tool**, paste
    `openwebui-tools/mac_lookup_tool.py`.
 4. Leave the `MAC_VENDOR_DB_PATH` valve at its default
@@ -71,7 +78,7 @@ signal is*, separate from your own capture/observation data.
 1. Run `./scripts/install-sigid-mirror.sh` (rootless) to populate
    `/data/reference/sigid` and install its weekly refresh timer.
    Validate with `./scripts/validate-sigid-mirror.sh`.
-2. Confirm the `sigid` mount is active: `podman inspect open-webui --format '{{range .Mounts}}{{.Destination}} {{end}}'`.
+2. Fallback only: add the `sigid` `Volume=` line from the Mounts section and re-run `install-open-webui.sh`.
 3. **Workspace → Tools → Create a new tool**, paste
    `openwebui-tools/sigid_reference_tool.py`.
 4. Leave the `SIGID_METADATA_DIR` valve at its default
@@ -90,7 +97,7 @@ immediately when asked.
 1. No mirror step — `/data/audio` already exists from
    `scripts/install-corpus-dirs.sh`. Just place audio files there (`.wav`,
    `.mp3`, `.m4a`, `.flac`, `.ogg`, `.opus`).
-2. Confirm the `audio` mount is active: `podman inspect open-webui --format '{{range .Mounts}}{{.Destination}} {{end}}'`.
+2. The `/data/audio` mount is already in `containers/open-webui.container`.
 3. **Workspace → Tools → Create a new tool**, paste
    `openwebui-tools/sigint_whisper_tool.py`. Open WebUI reads the file's
    `requirements: faster-whisper>=1.0.0` line and installs it into the
@@ -121,7 +128,7 @@ the gateway already installed (`./scripts/install-sigedge-gateway.sh`).
    `occupancy` venv and start `occupancy.service`, a persistent poller of
    the gateway's `/status` endpoint. Validate with
    `./scripts/validate-occupancy.sh`.
-2. Confirm the `occupancy` mount is active: `podman inspect open-webui --format '{{range .Mounts}}{{.Destination}} {{end}}'`.
+2. Fallback only: add the `occupancy` `Volume=` line from the Mounts section and re-run `install-open-webui.sh`.
 3. **Workspace → Tools → Create a new tool**, paste
    `openwebui-tools/occupancy_tool.py`.
 4. Leave the `OCCUPANCY_DB_PATH` valve at its default
@@ -149,7 +156,7 @@ Requires the gateway already installed
    poller of the gateway's `/kismet/summary/{node}` and
    `/kismet/devices/{node}` endpoints. Validate with
    `./scripts/validate-kismet-bridge.sh`.
-2. Confirm the `kismet-bridge` mount is active: `podman inspect open-webui --format '{{range .Mounts}}{{.Destination}} {{end}}'`.
+2. Fallback only: add the `kismet-bridge` `Volume=` line from the Mounts section and re-run `install-open-webui.sh`.
 3. **Workspace → Tools → Create a new tool**, paste
    `openwebui-tools/kismet_tool.py`.
 4. Leave the `KISMET_BRIDGE_DB_PATH` valve at its default
@@ -164,7 +171,8 @@ Requires the gateway already installed
 A read-only MCP service that serves the Kismet, occupancy, SigID, and MAC
 tools from a separate sandboxed container instead of inside Open WebUI. See
 [mcp-server-design.md](mcp-server-design.md) for the design and migration
-plan. It is optional and runs alongside the native tools above.
+plan. It is optional. Do not attach the MCP connection and the native
+fallback tools of the same name to one model.
 
 1. Prerequisites: the data directories exist (`install-corpus-dirs.sh`).
 2. `./scripts/install-sigliere-mcp.sh` (not `sudo`) builds the image, creates

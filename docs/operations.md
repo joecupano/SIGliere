@@ -77,6 +77,7 @@ Back up these items to encrypted storage:
 - `open-webui-state`: accounts, configuration, uploads, and vector data.
 - `caddy-data` and `caddy-config`: the internal CA and Caddy runtime state.
 - `~/.config/sigliere/gateway.env`: gateway credentials and dry-run setting.
+- `~/.config/sigliere/mcp.env`: the MCP server token, if installed.
 - `~/.config/containers/systemd/`: installed Quadlets, Caddy configuration,
   and certificates.
 - `/data/models`, `/data/corpus`, `/data/reference`, `/data/imagery`,

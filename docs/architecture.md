@@ -65,7 +65,11 @@ Security and integration boundaries:
 - Open WebUI also holds read-only mounts of SIGliere-owned AI-tier data
   (occupancy and Kismet-bridge mirrors, reference mirrors, audio). None are
   SIGedge collection data.
-- There is no parallel external OpenAPI or MCP query service.
+- The optional `sigliere-mcp` service (read-only tools over local mirrors,
+  `127.0.0.1:8150`) is reached only through the private router at
+  `http://127.0.0.1:8180/mcp/`. It holds no gateway credentials and is not
+  exposed on the LAN. See [mcp-server-design.md](mcp-server-design.md).
+- There is no external OpenAPI or MCP query service.
 ```
 
 - SIGedge owns the complete collection tier: hardware, SDR and protocol

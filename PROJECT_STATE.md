@@ -20,10 +20,10 @@ particular host has been installed or has passed live multicast validation.
 - Remote and same-host SIGedge deployments use the same version 1 node contract.
 - SIGliere does not read SIGedge configuration, systemd state, device profiles,
   capture databases, or collection files.
-- Open WebUI integrates through native Python tools; there is no parallel MCP
-  or external OpenAPI query path. (An MCP server has been evaluated and is a
-  possible future step — see "sigliere_core refactor" below — but is not
-  built and the rule stands.)
+- Open WebUI integrates through native Python tools. The only MCP path is the
+  optional loopback `sigliere-mcp` service (read-only, no gateway credentials,
+  behind Caddy's private router; see "MCP server" below). There is no external
+  OpenAPI or MCP query service.
 - Gateway access uses separate analyst and operator bearer tokens. Operator
   calls also check Open WebUI group membership, and control starts in dry-run.
 
@@ -368,6 +368,36 @@ and deliberately deferred until Option A was proven.
 - Tests: 76 pass with pydantic and requests installed (4 wrapper-behavior
   tests skip on a bare host); the generated tools also pass inside the
   v0.12.0 image.
+
+## MCP server (branch `MCP-Server`, 2026-10-11)
+
+Design: `docs/mcp-server-design.md` (approved). Phase 0 (server + tests) and
+Phase 1 (deployment) are done on `dungeon`; Open WebUI is not yet connected.
+
+- `mcp_server/`: FastMCP streamable-HTTP server, stateless, nine read-only
+  tools (Kismet, occupancy, SigID, MAC) over `sigliere_core`, `mcp==1.27.2`
+  (the version Open WebUI ships). Bearer gate, loopback-only bind enforced in
+  config, Host-header validation.
+- `containers/sigliere-mcp.container`: read-only data mounts, read-only root,
+  all capabilities dropped, no-new-privileges, no gateway credentials.
+- Caddy private router gained `/mcp` (always emitted by
+  `install-open-webui.sh`; 502 if the service is absent).
+- `scripts/install-sigliere-mcp.sh` / `validate-sigliere-mcp.sh`: validator
+  passes 20/20 on `dungeon` through the Caddy route (auth, tool list, one call
+  per tool, privileges). `/mcp` on the LAN-facing 8443 reaches Open WebUI, not
+  the MCP server.
+- Finding from Open WebUI v0.12.0's source: MCP tool names are prefixed with
+  the connection ID (`<id>_<tool>`), so they cannot collide with native tools,
+  and the server's `instructions` are injected into the system prompt.
+  Use connection ID `mcp` (not `sigliere`: see Phase 2 results in the design
+  doc). The system prompt's tool names must be updated at cutover.
+- Open WebUI was connected by the admin and works. Phase 2 (qwen3:14b) found
+  the connection ID changes tool-calling reliability: `sigliere` failed one
+  question reproducibly, `mcp`/`sig`/`local` did not. A connection created
+  with a blank ID gets a UUID prefix, which scored 72/104 (69%); the ID must
+  be set to `mcp` explicitly at creation (rename of the display name is not
+  enough). Prompt cost is +239
+  tokens (about 9.5%). Cutover (Phase 3) is not done.
 
 ## Known limitations and follow-up
 

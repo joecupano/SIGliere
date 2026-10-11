@@ -5,7 +5,8 @@
 Caddy HTTPS on TCP 8443 is the only application port allowed from the LAN.
 SSH remains allowed for administration. Open WebUI, Caddy's private router,
 Ollama, and the SIGedge gateway bind to loopback on ports 8080, 8180, 11434,
-and 8140 respectively.
+and 8140 respectively. The optional MCP server binds loopback port 8150 and is
+reachable only through the private router.
 
 Run:
 

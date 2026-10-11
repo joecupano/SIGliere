@@ -136,6 +136,15 @@ least one node with `kismet_host` set and a matching API key in
 ./scripts/validate-kismet-bridge.sh
 ```
 
+Optionally install the read-only MCP server
+([design](docs/mcp-server-design.md)). It needs the corpus directories and the
+Caddy `/mcp` route that `install-open-webui.sh` generates:
+
+```bash
+./scripts/install-sigliere-mcp.sh
+./scripts/validate-sigliere-mcp.sh
+```
+
 The Open WebUI container already mounts each optional data directory
 read-only (see `containers/open-webui.container`; `install-corpus-dirs.sh`
 creates the directories). Follow [optional-tools.md](docs/optional-tools.md)

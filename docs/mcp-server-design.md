@@ -1,7 +1,7 @@
 # MCP server design (proposal)
 
-Status: **design approved; Phase 0 (server and tests) implemented, not yet
-deployed.** Branch `MCP-Server`. Decisions approved: the scope and security
+Status: **design approved; Phases 0 and 1 done (server, tests, deployment on
+`dungeon`); Open WebUI connected and working; Phase 2 comparison run.** Branch `MCP-Server`. Decisions approved: the scope and security
 model below, plus recommendations 1, 2, and 3 from section 10. It follows the
 "Option A" work (`sigliere_core`, [tool-development.md](tool-development.md)),
 which was done first because the MCP server is a second set of thin wrappers
@@ -222,8 +222,8 @@ These documents currently forbid MCP and would change in Phase 3:
 | # | Question | Recommendation |
 |---|---|---|
 | 1 | **Output format.** MCP tools can return text, structured content, or both. Both would roughly double tokens if the client forwards both to the model. | **Approved and implemented.** Compact JSON text only (`structured_output=False`); failures use `isError`. A test asserts each result is a single text block with no structured duplicate. |
-| 2 | **Tool-name exposure.** Does v0.12 prefix MCP tool names? If not, native and MCP tools with identical names collide on a model that has both. | **Approved.** Verify in Phase 1. Use separate test models until Phase 3, so no model has both sets. |
-| 3 | **Behind-Caddy behavior.** Host-header handling, streaming flush, and request timeouts through the proxy. | **Approved.** Verify in Phase 1 with the validator; set generous timeouts for the MAC first-load. The Host check itself is already tested (see section 12). |
+| 2 | **Tool-name exposure.** Does v0.12 prefix MCP tool names? If not, native and MCP tools with identical names collide on a model that has both. | **Approved; answered from the v0.12.0 source.** Names are prefixed `<connection id>_<tool>`, so there is no collision. Use ID `mcp` (see section 14). The system prompt's tool names must change at cutover. The server's `instructions` are injected into the system prompt. Still use separate test models until Phase 3. |
+| 3 | **Behind-Caddy behavior.** Host-header handling, streaming flush, and request timeouts through the proxy. | **Approved; verified on `dungeon`.** `/mcp` and `/mcp/` both work through the private router, the forwarded Host is accepted, and 8443 does not route `/mcp` to the server (section 13). |
 | 4 | **Where the Open WebUI connection is configured.** Admin UI (stored in Open WebUI's database, as tool valves are today) versus `TOOL_SERVER_CONNECTIONS` env on first start. | Admin UI, documented in setup. Environment seeding only applies on first start and would put a token in a unit file. |
 | 5 | **Status tool.** Move it to MCP later? | Not initially. Revisit after the cutover; the core path stays independent. Moving it would add the gateway analyst token to `mcp.env`, which is the main reason to leave it native. |
 | 6 | **Scheduled analysis.** The deferred "proactive watch service" idea would also be an MCP client. | Out of scope here. The reuse is a reason to do this first. |
@@ -272,3 +272,79 @@ Implemented in `mcp_server/src/sigliere_mcp/` with 24 tests in
 
 Not yet done: the container image, Quadlet, Caddy route, installer and
 validator (Phase 1), and anything involving the live Open WebUI.
+
+## 13. Phase 1 results (`dungeon`, 2026-10-11)
+
+- Image `localhost/sigliere-mcp:latest` built from `mcp_server/Containerfile`
+  (context: repository root; only `sigliere_core` and the server package are
+  copied). Quadlet `containers/sigliere-mcp.container` installed; Podman 4.9.3
+  accepted `ReadOnly`, `NoNewPrivileges`, and `DropCapability=ALL`.
+- `scripts/validate-sigliere-mcp.sh`: 20 of 20 checks pass, all through the
+  Caddy route Open WebUI will use: loopback-only listener, 401 without or with
+  a wrong token (direct and via Caddy), initialize, exactly nine read-only
+  tools, one successful call per tool, no writable mounts, read-only root, and
+  `SIGLIERE_MCP_TOKEN` as the only credential in the container.
+- Real data via Caddy: `kismet_summary` returned the live mirror (5,611
+  devices).
+- Both `/mcp` and `/mcp/` reach the server; `https://<host>:8443/mcp` reaches
+  Open WebUI, not the MCP server. `validate-tiered.sh` still passes 7 of 7.
+- Static guards in `tests/test_mcp_deploy.py` pin the security properties:
+  every mount `:ro`, hardening flags, no gateway credentials, no published
+  ports, the Caddy route only on the private router, and the pinned SDK.
+- `validate-security-hardening.sh` needs `sudo` for its firewall check and was
+  not run here.
+
+Remaining: connect Open WebUI (admin step), the Phase 2 comparison, and the
+Phase 3 cutover.
+
+## 14. Phase 2 results
+
+Method: `qwen3:14b` through Ollama (temperature 0 and 0.2, several seeds,
+16k context), the repository's analyst system prompt, 13 representative
+questions. Variant A gives the model all seven native tools (15 functions, as
+Open WebUI generates them). Variant B gives it the nine MCP tools (as
+Open WebUI would expose them, name-prefixed, with the server's instructions
+injected) plus the three tools that stay native. The comparison is one turn:
+which tool and arguments the model chooses. Tool execution parity is covered
+separately by the Phase 0 parity tests.
+
+| Measure | Native | MCP (ID `sigliere`) |
+|---|---|---|
+| Prompt tokens per request | about 2,510 | about 2,749 (+239, 9.5%) |
+| Mean latency per request | 1.0 s | 1.1 s |
+| Same tool and arguments | | 12 of 13 questions |
+
+Finding: the one difference reproduced. For "What MAC prefixes does Cisco
+own?" the model called `search_mac_vendors` 12 of 12 times with native tools
+and **never** (0 of 12) with the MCP tools under the ID `sigliere`. One-factor
+tests isolated the cause to the name prefix (native schema with the MCP
+instructions block worked; the MCP schema for that one tool worked; MCP tools
+with no prefix worked). The prefix is `<connection id>_`, which Open WebUI
+adds, so the choice of connection ID matters.
+
+Connection ID sweep (13 questions, correct first tool, 10 seeds each):
+
+| ID | Correct |
+|---|---|
+| `mcp` | 130 / 130 |
+| `sig` | 130 / 130 |
+| `local` | 130 / 130 |
+| `sigliere` | 120 / 130 (Cisco question: 0 calls) |
+| `data` | 33 / 39 (earlier smaller run; two other misses) |
+
+A connection created with a blank Connection ID gets a random UUID, and the
+model then sees names like `c5dd5ded-3f36-..._query_wifi_devices`. Measured
+on the live connection's actual ID (8 seeds x 13 questions): **72 of 104
+correct (69%)** with the UUID prefix against 104 of 104 with `mcp`. Editing
+the connection's display name does not change the ID; the connection must be
+deleted and recreated with the ID field set.
+
+Decision: use connection ID `mcp`, set explicitly at creation. This is a model sensitivity, not a server
+defect, which is why it is worth re-running this comparison whenever the
+model, the tool descriptions, or the ID change. The Kismet questions in both
+variants begin with `kismet_summary`, as the system prompt instructs; the
+follow-up call is not exercised by a one-turn test.
+
+Open for Phase 3: update the system prompt's tool names, re-run this
+comparison on the final prompt and on `llama3-groq-tool-use:8b`, and retire
+the native copies once results hold.

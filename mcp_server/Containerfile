@@ -1,0 +1,19 @@
+FROM docker.io/library/python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY mcp_server/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Build context is the repository root (see scripts/install-sigliere-mcp.sh).
+COPY sigliere_core /app/sigliere_core
+COPY mcp_server/src/sigliere_mcp /app/sigliere_mcp
+
+ENV PYTHONPATH=/app
+ENV SIGLIERE_MCP_HOST=127.0.0.1
+ENV SIGLIERE_MCP_PORT=8150
+
+CMD ["python", "-m", "sigliere_mcp"]

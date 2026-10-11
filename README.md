@@ -30,6 +30,7 @@ ai-ingest/           Optional document, image, and audio ingest pipeline
 containers/          Rootless Podman Quadlets and Caddy policy
 docs/                Architecture and operator documentation
 gateway/             Versioned SIGedge contract, KA9Q client, and gateway API
+mcp_server/          Optional read-only MCP server over the local mirrors
 kismet_bridge/       Optional Kismet device-presence mirror database and gateway poller
 occupancy/           Optional occupancy (signals-heard) database and gateway poller
 openwebui-prompts/    Model and system-prompt configuration

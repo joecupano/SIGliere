@@ -41,9 +41,10 @@ In Open WebUI, open **Workspace → Tools**, create a tool, and paste each file:
 1. `openwebui-tools/sigedge_status_tool.py`
 2. `openwebui-tools/sigint_operator_tool.py`
 
-No external OpenAPI or MCP connection is required. (Open WebUI v0.12 lists
-tool and MCP connections under **Tools → Integrations**; SIGliere does not use
-them.)
+No external OpenAPI or MCP connection is required for the core install. The
+optional read-only MCP server is described in
+[optional-tools.md](optional-tools.md#mcp-server-optional); Open WebUI v0.12
+lists tool and MCP connections under **Tools → Integrations**.
 
 Read the generated tokens from `~/.config/sigliere/gateway.env`:
 

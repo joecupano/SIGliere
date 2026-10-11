@@ -1,0 +1,35 @@
+[Unit]
+Description=SIGliere MCP server (read-only tools over the local mirrors)
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=localhost/sigliere-mcp:latest
+ContainerName=sigliere-mcp
+# Host networking, but the server refuses to bind anything except loopback
+# (SIGLIERE_MCP_HOST is validated), and it is reached only through Caddy's
+# loopback-only private router at 127.0.0.1:8180/mcp.
+Network=host
+
+# Least privilege: no capabilities, no privilege escalation, immutable rootfs.
+DropCapability=ALL
+NoNewPrivileges=true
+ReadOnly=true
+
+# Read-only data mounts. This service holds no gateway token and writes
+# nothing; Podman will not start it if a source directory is missing, so run
+# scripts/install-corpus-dirs.sh first.
+Volume=/data/kismet-bridge:/data/kismet-bridge-ref:ro
+Volume=/data/occupancy:/data/occupancy-ref:ro
+Volume=/data/reference/sigid:/data/sigid-ref:ro
+Volume=/data/reference/mac-vendors:/data/mac-vendors-ref:ro
+
+# Contains only SIGLIERE_MCP_TOKEN (and host/port); never gateway.env.
+EnvironmentFile=%h/.config/sigliere/mcp.env
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

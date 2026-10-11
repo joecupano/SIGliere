@@ -10,6 +10,7 @@
 - [Occupancy guide](occupancy-guide.md) — signals-heard logging design and use.
 - [Kismet bridge guide](kismet-bridge-guide.md) — device-presence mirror design and use.
 - [Developing the native tools](tool-development.md) — `sigliere_core`, generated tools, and tests.
+- [MCP server design](mcp-server-design.md) — read-only, loopback MCP service (approved; server implemented, not yet deployed).
 - [Local RAG guide](rag-knowledge-base-guide.md) — Open WebUI Knowledge workflow.
 - [Operations](operations.md) — production control, credentials, backups, and upgrades.
 - [Security](security-hardening.md) — TLS, loopback bindings, and firewall.

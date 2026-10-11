@@ -39,6 +39,12 @@ Environment=ENABLE_CODE_INTERPRETER=False
 Environment=ENABLE_CODE_EXECUTION=False
 Environment=ENABLE_WEB_SEARCH=False
 Environment=ENABLE_DIRECT_CONNECTIONS=False
+# Knowledge/RAG embeddings: nomic-embed-text through the same private Ollama
+# route (install-ollama.sh pulls it). Open WebUI's own default is a built-in
+# CPU model; this keeps embedding on Ollama. Also seeds fresh installs only.
+Environment=RAG_EMBEDDING_ENGINE=ollama
+Environment=RAG_EMBEDDING_MODEL=nomic-embed-text
+Environment=RAG_OLLAMA_BASE_URL=http://127.0.0.1:8180/ollama
 Environment=WEBUI_SECRET_KEY_FILE=/app/backend/data/.webui_secret_key
 
 [Service]

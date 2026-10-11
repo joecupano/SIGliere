@@ -413,6 +413,10 @@ producers/mirrors behind it and Whisper remain optional.
   generation, code execution, community sharing, the OpenAI API connection,
   and the version check are off (UI and Quadlet); the OpenAI model-list
   requests that were reaching `api.openai.com` stopped.
+- Knowledge/RAG embeddings are set to `nomic-embed-text` via Ollama (Quadlet
+  for new installs; Admin → Settings → Documents for existing hosts). Open
+  WebUI's own default is a built-in CPU model, which is what a host runs
+  until the setting is changed. No documents were indexed at the time.
 
 ## Known limitations and follow-up
 
@@ -437,20 +441,20 @@ producers/mirrors behind it and Whisper remain optional.
   cross-contaminated) result.
 - `sigedge-vhf-uhf` remains an unverified aspirational placeholder — no
   general-coverage VHF/UHF receiver has been built to confirm or replace it.
-- `scripts/validate-tiered.sh` and `scripts/install-open-webui.sh` both
-  default `SIGLIERE_HOSTNAME` to `$(hostname -s).local`, which is wrong for
-  any host actually deployed with an IP-literal `SIGLIERE_HOSTNAME` (as
-  rubberduck was) unless the operator exports the same value again before
-  every validator run. Worth fixing in the scripts themselves — e.g.
-  recording the install-time value somewhere `validate-tiered.sh` can read
-  it — rather than relying on operators to remember and re-export it.
+- `scripts/validate-tiered.sh` used to default `SIGLIERE_HOSTNAME` to
+  `$(hostname -s).local`, giving a false TLS failure on IP-literal installs
+  unless the value was exported again. **Fixed 2026-10-11:** the validator now
+  reads the name from the installed Caddyfile. Also fixed: the installer's
+  readiness probe lacked `-f`, so Caddy's 502 during Open WebUI startup counted
+  as ready and an immediate validator run could fail the loopback check; it
+  now waits for the backend first (guarded by `tests/test_install_scripts.py`).
 - The standalone AI ingest output is not automatically indexed by Open WebUI;
   chat RAG currently uses Open WebUI's separate Knowledge feature.
 - Automated ingest validation covers DOCX, image OCR, and spoken audio. A real
   scanned PDF still requires a manual test.
 - Unit coverage now includes the gateway client, SigID manifest, occupancy,
   Kismet bridge, `sigliere_core`, the generated tools, and the MCP server plus
-  its deployment guards (111 tests).
+  its deployment guards and install-script guards (125 tests).
   Service,
   authorization, multicast, and container integration are covered by
   deployment validators rather than unit tests.
@@ -475,15 +479,22 @@ producers/mirrors behind it and Whisper remain optional.
 
 Verification performed on `dungeon` on 2026-10-11 (MCP cutover, final state):
 
-- `python3 -m unittest discover -s tests`: 111 tests pass with the `mcp` SDK,
+- `python3 -m unittest discover -s tests`: 125 tests pass with the `mcp` SDK,
   pydantic, and requests available (28 skipped on a bare host); the MCP tests
   also pass inside `ghcr.io/open-webui/open-webui:v0.12.0`.
-- `scripts/validate-tiered.sh` 7/7 and `scripts/validate-sigliere-mcp.sh`
-  20/20 after the final Open WebUI reinstall; container environment shows all
+- `scripts/validate-tiered.sh` (now 9 checks, including MCP) and
+  `scripts/validate-sigliere-mcp.sh` 20/20 after the final Open WebUI reinstall; container environment shows all
   `ENABLE_*` sovereign defaults `False`; installed Quadlet identical to the
   repository copy.
 - Stored Open WebUI settings and model records re-read from its database: no
   dangling tool references; all recommended settings applied.
+- Knowledge embeddings: after an engine/model mismatch was corrected (model
+  `nomic-embed-text` with the default engine had made Open WebUI query
+  `huggingface.co`), a restart showed no Hugging Face contact, and
+  `nomic-embed-text` returned 768-dimension vectors through the private
+  Ollama route. No documents are indexed.
+- `install-open-webui.sh` followed immediately by `validate-tiered.sh` passes
+  9/9 (the installer waited about 20 s for the backend).
 - Not run: `scripts/validate-security-hardening.sh` (its firewall check needs
   `sudo`), any SIGedge multicast test, and any gateway tune (dry-run remains
   `true`).

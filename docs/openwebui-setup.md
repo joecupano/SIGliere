@@ -113,6 +113,7 @@ apply them in **Admin Panel → Settings**.
 | Code interpreter and code execution | Off | An analysis model does not need to run code. Also untick the capability on each model. |
 | Models → Capabilities | Untick Web Search, Image Generation, Code Interpreter, Terminal | Prevents accidental use if a global feature is enabled later. |
 | Signup | Off, default role `pending` | Already set. |
+| Documents → **Embedding Model Engine** | Ollama, model `nomic-embed-text` | Open WebUI's default is a built-in CPU model; the Quadlet seeds Ollama for new installs. Set it before indexing any documents, because changing it later means re-indexing. Set the **engine dropdown**, not only the model name: a model name with the default engine makes Open WebUI look it up on Hugging Face at startup. |
 
 Model layout used on `dungeon`: an **Analyst** model (MCP tools, status,
 Whisper; no operator tool) and an **Operator** model (adds the operator tool),

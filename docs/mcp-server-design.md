@@ -427,6 +427,12 @@ Also done:
   and `docs/openwebui-setup.md`): same tool-selection accuracy, about ten times
   the latency with thinking on.
 
+Later changes to the shared tooling: `validate-tiered.sh` now has nine checks
+(it also requires the MCP server to answer through the private route and to
+reject anonymous requests), reads the TLS hostname from the installed
+Caddyfile, and the Open WebUI installer waits for the backend before it
+reports ready (its readiness probe had treated Caddy's 502 as success).
+
 Still open:
 
 - The Operator model still carries the MCP data tools. Recommended: give it

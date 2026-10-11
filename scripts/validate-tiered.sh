@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# The TLS name must match how install-open-webui.sh was run. If it is not
+# exported, read it back from the installed Caddyfile instead of guessing.
+CADDYFILE="${HOME}/.config/containers/systemd/Caddyfile"
+if [[ -z "${SIGLIERE_HOSTNAME:-}" && -r "${CADDYFILE}" ]]; then
+  SIGLIERE_HOSTNAME="$(sed -n 's/^\([^ {]*\):8443 {$/\1/p' "${CADDYFILE}" | head -1)"
+fi
 HOSTNAME_TLS="${SIGLIERE_HOSTNAME:-$(hostname -s).local}"
 ENV_FILE="${HOME}/.config/sigliere/gateway.env"
 failures=0

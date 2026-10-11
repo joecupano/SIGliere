@@ -42,8 +42,12 @@ output lands in `/data/corpus/processed` as a standalone corpus; nothing
 currently wires it into a chat-queryable retrieval layer.
 
 For a chat session that retrieves from this material, use **Open WebUI native
-Knowledge**. It provides embedding through `nomic-embed-text` and retrieval
-already wired into chat. If you also want this material in the standalone
+Knowledge**. It provides embedding and retrieval already wired into chat. By
+default Open WebUI embeds with a built-in CPU model
+(`sentence-transformers/all-MiniLM-L6-v2`), but this build sets embeddings to
+**`nomic-embed-text` through Ollama** (pulled by `install-ollama.sh`), reached
+over Caddy's private `/ollama` route, so retrieval makes no network calls
+outside the host. If you also want this material in the standalone
 pipeline corpus, that is an independent, optional step and is not required for
 the chat session below.
 
@@ -67,6 +71,12 @@ dependency, this reuses **Docling — already installed in the AI ingest
 `ai-ingest` venv** — the same conversion engine this build already
 relies on elsewhere, applied here as a one-off preprocessing pass
 rather than through the full `ingest.py` pipeline.
+
+**Prerequisite:** that venv only exists once the AI ingest capability is
+installed (`./scripts/install-ai-ingest.sh`; see [INSTALL.md](../INSTALL.md)
+section 8). It is not part of the core install, so check that
+`${HOME}/.local/share/sigliere/venvs/ai-ingest/bin/python3` exists before
+Step 2, and run the installer if it does not.
 
 Save this as `~/rag-demo/convert.py`:
 
@@ -133,20 +143,30 @@ Log into Open WebUI and:
 
 *(Core install: `https://<configured-hostname>:8443/`. Caddy TLS is mandatory; see docs/security-hardening.md.)*
 
-1. **Workspace → Knowledge → Create a new collection** — name it
-   something like "Antenna Design (Cebik)"
+1. **Workspace → Knowledge → Create Knowledge** (a "Knowledge Base") — name
+   it something like "Antenna Design (Cebik)"
 2. **Upload the converted files** — the `.md` files from
-   `~/rag-demo/converted`. Open WebUI will chunk and embed each one
-   using whatever embedding model is configured in Admin Settings →
-   Documents (should be `nomic-embed-text`; confirm it here
-   — worth confirming rather than assuming it stuck).
+   `~/rag-demo/converted`, using **Upload files** (or **Upload directory** for
+   the whole folder; **Sync directory** re-syncs a folder that changes).
+   Open WebUI will chunk and embed each one using the embedding model set
+   in **Admin Panel → Settings → Documents**. Confirm it shows **Embedding Model
+   Engine: Ollama** and model `nomic-embed-text` (chunk size 1000, overlap 100,
+   top-k 3 are the defaults). A fresh install is seeded with that through the
+   Quadlet; on an existing host the stored setting wins, so set it here once,
+   before indexing anything. **Change the Embedding Model Engine dropdown to
+   Ollama, not just the model name:** with the engine left on the default,
+   Open WebUI treats `nomic-embed-text` as a Hugging Face model name and, on
+   the next start, contacts `huggingface.co` looking for it (observed on this
+   host, answered 401) instead of using Ollama. Changing the embedding model after documents are
+   indexed means re-indexing everything.
 3. Wait for indexing to complete — with hundreds of files, this takes
    real time. Open WebUI shows per-file processing status; let it finish
    before querying.
 
 *(Menu wording may shift slightly across Open WebUI versions — if
 "Knowledge" isn't where you expect, check Workspace's other tabs; the
-underlying feature has been stable even when labels move.)*
+underlying feature has been stable even when labels move. The names above were
+checked against Open WebUI v0.12.0; see "Verification status" at the end.)*
 
 ## Step 4: Attach the Knowledge Base to a Chat
 
@@ -157,7 +177,16 @@ Two ways to use it once indexed:
   message
 - **Always-on for a custom model:** Workspace → Models → create a model
   based on `qwen3:14b`, attach the Knowledge collection in its settings
-  — every chat with that model retrieves from it automatically
+  — every chat with that model retrieves from it automatically while its
+  **File Context** capability is on (the default). Attach it to the Analyst
+  model or to a separate research model, not to the Operator model that can
+  tune receivers.
+
+With **native function calling** (the setting the SIGINT models use), Open WebUI
+also lists the attached knowledge to the model and gives it built-in knowledge
+query tools, so the model may run its own follow-up searches in addition to the
+automatic retrieval. If you keep **Built-in Tools** off for a model, only the
+automatic retrieval applies.
 
 For this first test, the `#` reference per-message is simpler and lets
 you compare answers with and without RAG active.
@@ -206,3 +235,26 @@ happening, not just Ollama answering from general training data anyway.
   converted `.md` files into `/data/corpus/source` and re-run
   `./scripts/install-ai-ingest.sh` — an independent, optional step, not
   required for the chat-session path above.
+
+## Verification status
+
+Checked on 2026-10-11 against Open WebUI **v0.12.0** on `dungeon`, by reading
+the running container's frontend bundle, backend code, and stored settings:
+
+| Item | Result |
+|---|---|
+| Workspace → Knowledge and Workspace → Models routes | Present |
+| Labels "Create Knowledge", "Upload files", "Upload directory", "Sync directory", "Attach Knowledge" | Present (the old "Create a new collection" wording is gone) |
+| Admin Settings → Documents with "Embedding Model Engine" | Present |
+| `#` trigger in the chat box | Present in the chat input; the exact collection-picker wording was not seen rendered |
+| Embedding model | Open WebUI's own default is the built-in `all-MiniLM-L6-v2`; this build sets `nomic-embed-text` via Ollama in the Quadlet (new installs) and the Documents setting (existing hosts). `nomic-embed-text` returned 768-dimension vectors through the private route |
+| Knowledge with native function calling | Automatic retrieval still runs (File Context on), plus built-in knowledge tools |
+| Engine set to the default while the model is `nomic-embed-text` | Misconfiguration, seen once on `dungeon`: Open WebUI asked `huggingface.co` for `sentence-transformers/nomic-embed-text` at startup. After setting the engine to Ollama, a restart showed no Hugging Face contact |
+| `ai-ingest` venv and Docling (Step 2) | Docling is in `ai-ingest/requirements.txt`, but the venv is **not installed** on `dungeon` |
+
+Not verified: the end-to-end flow (cloning the source, converting it, indexing
+hundreds of files, and the example chat questions). No corpus has been indexed
+on this host, so retrieval quality and indexing time are untested here. The
+only network use in the whole procedure is the `git clone` in Step 1 (and a
+first-time embedding-model download if the model were not already cached).
+

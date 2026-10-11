@@ -104,15 +104,20 @@ sudo ./scripts/install-security-hardening.sh
 ./scripts/validate-tiered.sh
 ```
 
-`validate-tiered.sh` defaults the TLS hostname to `$(hostname -s).local`. If
-you installed with an IP-literal or other `SIGLIERE_HOSTNAME`, export the same
-value before running it, or the TLS check will report a false failure.
+`validate-tiered.sh` reads the TLS hostname back from the installed Caddyfile,
+so it matches whatever `SIGLIERE_HOSTNAME` you installed with. You can still
+export `SIGLIERE_HOSTNAME` to override it. The Open WebUI installer waits for
+Open WebUI itself (up to 3 minutes, longer than a typical start) before it
+reports ready, so the validator can be run straight after it.
 
 ## 7. Open WebUI tools and the MCP connection
 
 Follow [openwebui-setup.md](docs/openwebui-setup.md) to install the native SIGedge
 status and operator tools, configure their tokens, and connect the MCP server
-(Connection ID `mcp`).
+(Connection ID `mcp`). The Quadlet seeds Knowledge embeddings as
+`nomic-embed-text` through Ollama for a fresh install; on an existing host set
+**Admin Panel → Settings → Documents → Embedding Model Engine** to Ollama before
+indexing anything (see [rag-knowledge-base-guide.md](docs/rag-knowledge-base-guide.md)).
 
 ## 8. Optional local capabilities
 

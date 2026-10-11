@@ -67,6 +67,12 @@ class OpenWebUiQuadletTests(unittest.TestCase):
                     "ENABLE_DIRECT_CONNECTIONS"):
             self.assertEqual(env.get(key), "False", key)
 
+    def test_knowledge_embeddings_use_ollama_through_the_private_route(self):
+        env = dict(re.findall(r"^Environment=(\w+)=(.*)$", self.OWUI, re.M))
+        self.assertEqual(env["RAG_EMBEDDING_ENGINE"], "ollama")
+        self.assertEqual(env["RAG_EMBEDDING_MODEL"], "nomic-embed-text")
+        self.assertEqual(env["RAG_OLLAMA_BASE_URL"], "http://127.0.0.1:8180/ollama")
+
     def test_only_the_private_ollama_route_is_a_model_backend(self):
         env = dict(re.findall(r"^Environment=(\w+)=(.*)$", self.OWUI, re.M))
         self.assertEqual(env["OLLAMA_BASE_URL"], "http://127.0.0.1:8180/ollama")

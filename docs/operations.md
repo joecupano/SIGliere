@@ -161,7 +161,8 @@ move a pinned tag.
    SIGLIERE_HOSTNAME=<host-or-ip> ./scripts/install-open-webui.sh
    ```
 5. Verify: `curl -s http://127.0.0.1:8080/api/version`, then
-   `SIGLIERE_HOSTNAME=<host-or-ip> ./scripts/validate-tiered.sh`, then run one
+   `./scripts/validate-tiered.sh` (it reads the hostname from the installed
+   Caddyfile; the installer already waits for Open WebUI to be up), then run one
    query through each tool (native and MCP) in the UI.
 
 To roll back, restore the old tag and import the exported volume

@@ -72,15 +72,34 @@ systemctl --user daemon-reload
 systemctl --user restart open-webui.service
 systemctl --user restart caddy.service
 
+# Wait for Open WebUI itself first. Caddy answers 502 while the backend is
+# still starting, and a plain `curl` treats a 502 as success, so probing only
+# through Caddy reported "ready" too early (and a validator run straight after
+# the install then failed). Open WebUI can take a minute or more to come up,
+# especially right after an upgrade.
+backend_ready=0
+for _ in $(seq 1 180); do
+  if curl -fsS http://127.0.0.1:8080/api/version >/dev/null 2>&1; then
+    backend_ready=1
+    break
+  fi
+  sleep 1
+done
+if [[ "${backend_ready}" != "1" ]]; then
+  echo "Open WebUI did not answer on 127.0.0.1:8080 within 180 s; inspect:" >&2
+  echo "  journalctl --user -u open-webui.service -n 50" >&2
+  exit 1
+fi
+
 ready=0
 for _ in $(seq 1 60); do
   if [[ "${HOSTNAME_TLS}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     # An IP-literal host gets no SNI from real clients (RFC 6066); Caddy
     # then matches by actual destination address, so probe that address
     # directly rather than faking DNS to loopback.
-    PROBE=(curl -ksS "https://${HOSTNAME_TLS}:8443/")
+    PROBE=(curl -fksS "https://${HOSTNAME_TLS}:8443/")
   else
-    PROBE=(curl -ksS --resolve "${HOSTNAME_TLS}:8443:127.0.0.1" "https://${HOSTNAME_TLS}:8443/")
+    PROBE=(curl -fksS --resolve "${HOSTNAME_TLS}:8443:127.0.0.1" "https://${HOSTNAME_TLS}:8443/")
   fi
   if "${PROBE[@]}" >/dev/null 2>&1; then
     ready=1

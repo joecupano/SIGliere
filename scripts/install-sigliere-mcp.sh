@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/install-sigliere-mcp.sh
 #
-# Optional MCP server: read-only tools over the local Kismet, occupancy,
+# MCP server (a standard component of the install): read-only tools over the local Kismet, occupancy,
 # SigID, and MAC-vendor mirrors, served on 127.0.0.1:8150 and reached only
 # through Caddy's loopback router at http://127.0.0.1:8180/mcp.
 # See docs/mcp-server-design.md.
@@ -10,8 +10,8 @@
 # run; preserved afterwards), installs the Quadlet, and starts the service.
 # The environment file holds only the MCP token: no gateway credentials.
 #
-# Run as your normal user, NOT with sudo. Re-run scripts/install-open-webui.sh
-# afterwards if the Caddy /mcp route is not present yet.
+# Run as your normal user, NOT with sudo, after scripts/install-open-webui.sh
+# (which generates the Caddy /mcp route). Re-run that if the route is missing.
 #
 # Usage: ./scripts/install-sigliere-mcp.sh
 

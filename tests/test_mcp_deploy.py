@@ -103,6 +103,32 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('"$(id -u)" -eq 0', INSTALL_MCP)
 
 
+class StandardInstallTests(unittest.TestCase):
+    """The MCP server is part of the standard install, not an add-on."""
+    INSTALL_MD = (REPO / "INSTALL.md").read_text()
+    TIERED = (REPO / "scripts" / "validate-tiered.sh").read_text()
+
+    def test_install_md_has_mcp_in_the_numbered_sequence_before_optional(self):
+        mcp = self.INSTALL_MD.index("./scripts/install-sigliere-mcp.sh")
+        optional = self.INSTALL_MD.index("## 8. Optional local capabilities")
+        owui = self.INSTALL_MD.index("./scripts/install-open-webui.sh")
+        self.assertLess(owui, mcp)       # needs the Caddy /mcp route first
+        self.assertLess(mcp, optional)   # a core step, not an optional capability
+        self.assertIn("## 5. MCP server", self.INSTALL_MD)
+
+    def test_nothing_calls_the_server_optional(self):
+        for path in ("INSTALL.md", "README.md", "docs/architecture.md",
+                     "docs/openwebui-setup.md", "scripts/install-sigliere-mcp.sh",
+                     "containers/open-webui.container"):
+            text = (REPO / path).read_text().lower()
+            self.assertNotRegex(text, r"optional[^.\n]{0,40}mcp|mcp[^.\n]{0,30}\(optional\)", path)
+
+    def test_core_validator_checks_the_mcp_server(self):
+        self.assertIn("MCP server through private Caddy route", self.TIERED)
+        self.assertIn("MCP server rejects requests without a token", self.TIERED)
+        self.assertIn("mcp.env", self.TIERED)
+
+
 class ImageTests(unittest.TestCase):
     def test_sdk_pinned_and_only_core_copied(self):
         self.assertIn("mcp==1.27.2", (REPO / "mcp_server" / "requirements.txt").read_text())

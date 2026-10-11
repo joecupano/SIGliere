@@ -13,7 +13,7 @@ It installs no collection or DSP packages.
 
 `install-corpus-dirs.sh` builds the whole `/data` corpus tree up front (see
 [data-layout.md](docs/data-layout.md)) — not just the ai-ingest/reference-mirror
-directories used by the optional capabilities described in section 7. Every
+directories used by the optional capabilities described in section 8. Every
 later step, including `install-ollama.sh`'s `/data/models`, assumes this tree
 exists with the right ownership; running it here, before anything else
 touches `/data`, keeps that assumption true instead of leaving it to
@@ -78,7 +78,25 @@ Subject Alternative Name, so operators browse straight to
 Each client still needs to trust the internal CA once (or click through the
 browser warning) exactly as with a hostname deployment.
 
-## 5. Firewall and validation
+## 5. MCP server
+
+The Kismet, occupancy, SigID, and MAC-vendor tools are served to Open WebUI by
+a read-only MCP server (`mcp_server/`, [design](docs/mcp-server-design.md)).
+It is part of the standard install: Open WebUI does not mount that data, so
+without it those tools are unavailable. It needs the corpus directories from
+step 1 and the `/mcp` route that step 4 generates:
+
+```bash
+./scripts/install-sigliere-mcp.sh
+./scripts/validate-sigliere-mcp.sh
+```
+
+The installer creates `~/.config/sigliere/mcp.env` (mode 0600, the MCP token
+only, no gateway credentials) and starts `sigliere-mcp.service` on
+`127.0.0.1:8150`. The service starts fine before any data exists; its tools
+report "no data" until the producers and mirrors in step 8 have run.
+
+## 6. Firewall and validation
 
 ```bash
 sudo ./scripts/install-security-hardening.sh
@@ -90,12 +108,13 @@ sudo ./scripts/install-security-hardening.sh
 you installed with an IP-literal or other `SIGLIERE_HOSTNAME`, export the same
 value before running it, or the TLS check will report a false failure.
 
-## 6. Open WebUI tools
+## 7. Open WebUI tools and the MCP connection
 
 Follow [openwebui-setup.md](docs/openwebui-setup.md) to install the native SIGedge
-status and operator tools and configure their tokens.
+status and operator tools, configure their tokens, and connect the MCP server
+(Connection ID `mcp`).
 
-## 7. Optional local capabilities
+## 8. Optional local capabilities
 
 These components are not required for the core gateway and Open WebUI
 deployment.
@@ -136,24 +155,14 @@ least one node with `kismet_host` set and a matching API key in
 ./scripts/validate-kismet-bridge.sh
 ```
 
-Optionally install the read-only MCP server
-([design](docs/mcp-server-design.md)). It needs the corpus directories and the
-Caddy `/mcp` route that `install-open-webui.sh` generates:
-
-```bash
-./scripts/install-sigliere-mcp.sh
-./scripts/validate-sigliere-mcp.sh
-```
-
 Open WebUI mounts only `/data/audio`; the Kismet, occupancy, SigID, and
-MAC-vendor data is read by the MCP server's own read-only mounts
-(`install-corpus-dirs.sh` creates the directories). Follow
-[optional-tools.md](docs/optional-tools.md) to connect the MCP server and to
-install Whisper (and, if wanted, the native fallback tools). For chat RAG,
+MAC-vendor data is read by the MCP server installed in step 5. Follow
+[optional-tools.md](docs/optional-tools.md) to install Whisper (and, if
+wanted, the native fallback tools). For chat RAG,
 follow [rag-knowledge-base-guide.md](docs/rag-knowledge-base-guide.md); the
 standalone AI ingest output is not indexed by Open WebUI automatically.
 
-## 8. Operations
+## 9. Operations
 
 Before enabling live gateway control, rotating tokens, backing up state, or
 upgrading services, read [operations.md](docs/operations.md).

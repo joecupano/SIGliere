@@ -61,12 +61,12 @@ Security and integration boundaries:
 - Only Caddy TCP 8443 is reachable from the LAN.
 - Open WebUI, the private router, Ollama, and the gateway are loopback-only.
 - Open WebUI reaches Ollama through `/ollama`; native tools reach the gateway
-  through `/gateway`; MCP tools (optional) are reached through `/mcp`. All use
+  through `/gateway`; MCP tools are reached through `/mcp`. All use
   Caddy's loopback-only private router.
-- Open WebUI mounts only `/data/audio` read-only. The optional MCP server
+- Open WebUI mounts only `/data/audio` read-only. The MCP server
   holds the read-only mounts of SIGliere-owned mirrors (occupancy,
   Kismet-bridge, SigID, MAC vendors). None are SIGedge collection data.
-- The optional `sigliere-mcp` service (read-only tools over local mirrors,
+- The `sigliere-mcp` service (read-only tools over local mirrors,
   `127.0.0.1:8150`) is reached only through the private router at
   `http://127.0.0.1:8180/mcp/`. It holds no gateway credentials and is not
   exposed on the LAN. See [mcp-server-design.md](mcp-server-design.md).
@@ -135,7 +135,7 @@ Caddy TLS ingress (host network)
                                       |                             |
                                       |                      KA9Q multicast
                                       |
-                                      +-- MCP tools (optional) --> Caddy 127.0.0.1:8180/mcp
+                                      +-- MCP tools --> Caddy 127.0.0.1:8180/mcp
                                                           |
                                                           +--> 127.0.0.1:8150  sigliere-mcp
                                                                (read-only mirrors; no gateway token)

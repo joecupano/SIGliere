@@ -1,6 +1,7 @@
 # MCP server design
 
-Status: **implemented and cut over on `dungeon` (2026-10-11).** Phases 0 to 3
+Status: **implemented and cut over on `dungeon` (2026-10-11); the MCP server
+is a standard, always-installed component of this branch.** Phases 0 to 3
 are done: server and tests, deployment behind Caddy, the model comparison, and
 the cutover of the Kismet, occupancy, SigID, and MAC tools to MCP (sections 12
 to 15 record the results). The only remaining item is removing the native
@@ -32,9 +33,11 @@ usage guidance.
 
 ## 2. Non-goals
 
-- **Not a replacement for the core path.** Gateway status and operator tuning
-  stay native Open WebUI tools. The core install (Ollama, gateway, Open WebUI,
-  Caddy) must keep working with no MCP service present.
+- **Not on the control path.** Gateway status and operator tuning stay native
+  Open WebUI tools, so no receiver control or gateway call runs through the
+  MCP server. The MCP server is a **standard, always-installed component** of
+  this branch (install step 5); what it serves is the read-only data tools, and
+  without it Open WebUI has none of them (it no longer mounts that data).
 - **No control.** The MCP server never tunes a receiver, never holds the
   operator token, and never writes to any database.
 - **No new ingress.** Nothing here is reachable from the LAN.
@@ -94,7 +97,7 @@ Properties:
 | Occupancy (`query_occupancy`, `occupancy_sightings`, `occupancy_summary`) | **MCP** | Read-only mirror query |
 | SigID (`lookup_signal`, `search_signals`) | **MCP** | Read-only reference |
 | MAC vendor (`lookup_mac_vendor`, `search_mac_vendors`) | **MCP** | Read-only reference; the 58k-entry index is cached once in a long-lived process |
-| SIGedge status (`list_sigedge_nodes`, `sigedge_status`) | **Native** (revisit later) | It is part of the core path, which must not depend on an optional service, and moving it would give the MCP server a gateway token |
+| SIGedge status (`list_sigedge_nodes`, `sigedge_status`) | **Native** (revisit later) | It sits on the gateway path, which should not depend on the data-tool service, and moving it would give the MCP server a gateway token |
 | Operator control (`list_controllable_nodes`, tune) | **Native, permanently** | Its live Open WebUI group-membership check cannot be reproduced outside Open WebUI |
 | Whisper transcription | **Native** | Needs audio file access and a GPU/model in the Open WebUI container |
 
@@ -213,11 +216,11 @@ These documents forbade MCP and were amended at cutover (done):
 - `docs/architecture.md` (boundaries list): replace "There is no parallel
   external OpenAPI or MCP query service." with "MCP is permitted only as the
   loopback `sigliere-mcp` service behind Caddy's private router: read-only,
-  holding no gateway credentials, optional. There is no external OpenAPI or
-  MCP query service."
+  holding no gateway credentials, and part of the standard install. There is
+  no external OpenAPI or MCP query service."
 - `PROJECT_STATE.md` ("Fixed architecture and security rules"): same wording.
 - `docs/openwebui-setup.md`: replace "No external OpenAPI or MCP connection is
-  required" with instructions for the optional `sigliere-mcp` connection.
+  required" with instructions for the `sigliere-mcp` connection (now a standard step).
 - `docs/optional-tools.md`, `docs/operations.md`, `INSTALL.md`: install,
   token rotation, and upgrade steps for the MCP service.
 

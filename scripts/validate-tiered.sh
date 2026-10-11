@@ -38,6 +38,27 @@ else
   failures=$((failures + 1))
 fi
 
+# MCP server (standard component): reachable through the private router, and
+# it must reject requests that carry no token.
+MCP_ENV="${HOME}/.config/sigliere/mcp.env"
+MCP_URL="http://127.0.0.1:8180/mcp/"
+MCP_INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"validate-tiered","version":"0"}}}'
+if [[ -r "${MCP_ENV}" ]]; then
+  MCP_TOKEN="$(sed -n 's/^SIGLIERE_MCP_TOKEN=//p' "${MCP_ENV}")"
+  check "MCP server through private Caddy route" curl -fsS -X POST "${MCP_URL}" \
+    -H "Authorization: Bearer ${MCP_TOKEN}" -H 'Content-Type: application/json' \
+    -H 'Accept: application/json, text/event-stream' --data "${MCP_INIT}"
+  mcp_rejects_anonymous() {
+    [[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${MCP_URL}" \
+      -H 'Content-Type: application/json' \
+      -H 'Accept: application/json, text/event-stream' --data "${MCP_INIT}")" == "401" ]]
+  }
+  check "MCP server rejects requests without a token" mcp_rejects_anonymous
+else
+  echo "FAIL  MCP environment missing: ${MCP_ENV} (run scripts/install-sigliere-mcp.sh)"
+  failures=$((failures + 1))
+fi
+
 check "Caddy configuration" podman exec caddy caddy validate   --config /etc/caddy/Caddyfile
 check "Open WebUI to Ollama" podman exec open-webui curl -fsS   http://127.0.0.1:8180/ollama/api/tags
 

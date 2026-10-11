@@ -21,7 +21,7 @@ particular host has been installed or has passed live multicast validation.
 - SIGliere does not read SIGedge configuration, systemd state, device profiles,
   capture databases, or collection files.
 - Open WebUI integrates through native Python tools. The only MCP path is the
-  optional loopback `sigliere-mcp` service (read-only, no gateway credentials,
+  loopback `sigliere-mcp` service, a standard component of the install (read-only, no gateway credentials,
   behind Caddy's private router; see "MCP server" below). There is no external
   OpenAPI or MCP query service.
 - Gateway access uses separate analyst and operator bearer tokens. Operator
@@ -36,7 +36,7 @@ particular host has been installed or has passed live multicast validation.
 - Validation scripts for OS packages, Ollama, security boundaries, and the
   assembled tiered service path.
 - Rootless Podman Quadlets for Caddy, Open WebUI, and the gateway, plus the
-  optional MCP server.
+  MCP server.
 - Mandatory HTTPS ingress with internal-CA and operator-certificate modes,
   including IP-literal deployments.
 - A versioned SIGedge node contract with explicit multicast status addresses,
@@ -54,7 +54,7 @@ particular host has been installed or has passed live multicast validation.
 - Weekly local SigID and IEEE MAC-vendor mirrors, with installers, validators,
   manifests, and user timers.
 - SigID and MAC-vendor lookup and Kismet/occupancy queries, served to Open
-  WebUI by the optional read-only MCP server (`mcp_server/`); on-demand Whisper
+  WebUI by the read-only MCP server (`mcp_server/`); on-demand Whisper
   transcription remains a native Open WebUI tool. Native fallback copies of
   the four data tools are kept for one release (see "MCP server" below).
 - A local Open WebUI Knowledge/RAG workflow documented with an antenna-design
@@ -375,7 +375,9 @@ and deliberately deferred until Option A was proven.
 ## MCP server (branch `MCP-Server`, 2026-10-11)
 
 Design and results: `docs/mcp-server-design.md`. Implemented and cut over on
-`dungeon`.
+`dungeon`. On this branch the MCP server is a standard, always-installed
+component (`INSTALL.md` step 5; `validate-tiered.sh` checks it); only the data
+producers/mirrors behind it and Whisper remain optional.
 
 - `mcp_server/`: FastMCP streamable-HTTP server, stateless, nine read-only
   tools (Kismet, occupancy, SigID, MAC) over `sigliere_core`, `mcp==1.27.2`

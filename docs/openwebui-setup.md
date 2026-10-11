@@ -4,7 +4,7 @@ Open WebUI is available at `https://<hostname-ip>:8443/`.
 ## Deployment details
 The container has one read-write mount, `open-webui-state:/app/backend/data`,
 plus a read-only `/data/audio` for transcription. The Kismet, occupancy,
-SigID, and MAC-vendor data is read by the optional MCP server in its own
+SigID, and MAC-vendor data is read by the MCP server in its own
 sandboxed container, not by Open WebUI. Collection databases, Kismet files,
 packet captures, and SDR data are never mounted because SIGedge owns them.
 
@@ -39,10 +39,8 @@ In Open WebUI, open **Workspace → Tools**, create a tool, and paste each file:
 1. `openwebui-tools/sigedge_status_tool.py`
 2. `openwebui-tools/sigint_operator_tool.py`
 
-No external OpenAPI or MCP connection is required for the core install. The
-optional read-only MCP server is described in
-[optional-tools.md](optional-tools.md#mcp-server-optional); Open WebUI v0.12
-lists tool and MCP connections under **Tools → Integrations**.
+No external OpenAPI connection is used. The MCP server (install step 5) is a
+standard component and is connected below.
 
 Read the generated tokens from `~/.config/sigliere/gateway.env`:
 
@@ -72,6 +70,32 @@ Keep `SIGLIERE_GATEWAY_DRY_RUN=true` until live multicast status and
 authorization have both been verified. Follow the
 [operations guide](operations.md#enable-or-disable-live-gateway-control) for
 the production transition and rollback procedure.
+
+## Connect the MCP server
+
+The Kismet, occupancy, SigID, and MAC-vendor tools come from the MCP server
+(`./scripts/install-sigliere-mcp.sh`, then `./scripts/validate-sigliere-mcp.sh`;
+[design](mcp-server-design.md)). Connect it once, as an admin, in
+**Admin Panel → Settings → Integrations** (v0.12 lists tool and MCP connections
+there):
+
+1. Add a connection of type **MCP (Streamable HTTP)**.
+2. URL `http://127.0.0.1:8180/mcp/`; auth **Bearer**; the token is the
+   `SIGLIERE_MCP_TOKEN` line in `~/.config/sigliere/mcp.env`.
+3. **Set the Connection ID field to `mcp` explicitly.** If it is left blank
+   Open WebUI generates a UUID, and editing the display name afterwards does
+   not change it (delete and recreate instead). The ID is prefixed onto every
+   tool name the model sees (`mcp_query_wifi_devices`), and the choice matters:
+   with `qwen3:14b` a blank ID gave the right first tool 72 of 104 times, the
+   ID `sigliere` missed one question every time, and `mcp` scored 104 of 104
+   (see [mcp-server-design.md](mcp-server-design.md#14-phase-2-results)).
+4. Set the function filter to the nine tool names, comma-separated:
+   `kismet_summary, query_wifi_devices, occupancy_summary, query_occupancy,
+   occupancy_sightings, lookup_signal, search_signals, lookup_mac_vendor,
+   search_mac_vendors`. Leave direct connections disabled.
+5. An empty access list means admin-only. Grant a group if analysts need it.
+6. Attach the connection to the Analyst model. Do not attach the native
+   fallback tools of the same names to the same model.
 
 ## Recommended Open WebUI settings for a sovereign deployment
 
@@ -130,7 +154,6 @@ For a model that uses the MCP tools, use
 [SIGINT-analyst-mcp.system-prompt.md](../openwebui-prompts/SIGINT-analyst-mcp.system-prompt.md)
 and keep function calling set to native.
 
-See [optional-tools.md](optional-tools.md) for installing the MCP server (the
-recommended path for the data tools), the native fallback tools, and the
-mounts they need.
+See [optional-tools.md](optional-tools.md) for Whisper and the native fallback
+tools, and the mounts they need.
 

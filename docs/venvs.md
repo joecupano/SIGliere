@@ -9,7 +9,7 @@ Optional host-side Python functions use capability-specific environments:
 | Occupancy | `~/.local/share/sigliere/venvs/occupancy` | `occupancy/requirements.txt` |
 | Kismet bridge | `~/.local/share/sigliere/venvs/kismet-bridge` | `kismet_bridge/requirements.txt` |
 
-The SIGedge gateway and the optional MCP server (`mcp_server/`) are
+The SIGedge gateway and the MCP server (`mcp_server/`) are
 containerized and installs `gateway/requirements.txt`
 inside its image. No DSP or collection-processing environment exists here.
 

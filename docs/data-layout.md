@@ -14,7 +14,7 @@ SIGliere stores only AI and optional reference data:
 /data/kismet-bridge              optional Kismet device-presence mirror database
 ```
 
-Open WebUI mounts only `/data/audio` (read-only). The optional MCP server
+Open WebUI mounts only `/data/audio` (read-only). The MCP server
 (`containers/sigliere-mcp.container`) mounts the occupancy, Kismet-bridge,
 SigID, and MAC-vendor directories read-only.
 

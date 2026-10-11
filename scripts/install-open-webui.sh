@@ -51,9 +51,9 @@ umask 077
   printf '\thandle_path /gateway/* {\n'
   printf '\t\treverse_proxy 127.0.0.1:8140\n'
   printf '\t}\n'
-  # Optional MCP server (scripts/install-sigliere-mcp.sh). Matches /mcp and
+  # MCP server (scripts/install-sigliere-mcp.sh). Matches /mcp and
   # /mcp/..., strips the prefix, and streams responses. Returns 502 on this
-  # loopback-only router if the service is not installed.
+  # loopback-only router until the service is installed.
   printf '\t@mcp path /mcp /mcp/*\n'
   printf '\thandle @mcp {\n'
   printf '\t\turi strip_prefix /mcp\n'
